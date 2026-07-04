@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 400" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="uf-arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#0B7285"/>
+    </marker>
+  </defs>
+  <style>
+    .t{font-size:13px;font-weight:700;fill:#1f2933}
+    .s{font-size:11px;fill:#5f6b7a}
+    .rank{font-size:12px;font-weight:700;fill:#ffffff}
+    .cap{font-size:11px;fill:#94a3b8}
+  </style>
+
+  <text class="t" x="30" y="34" font-size="15">Uplink priority &amp; failover</text>
+  <text class="s" x="30" y="54">The router keeps the highest-priority uplink that has working internet.</text>
+
+  <!-- Priority 1: LAN -->
+  <rect x="30" y="80" width="230" height="86" rx="12" fill="#0B7285"/>
+  <circle cx="66" cy="112" r="16" fill="#ffffff"/>
+  <text x="66" y="117" text-anchor="middle" font-size="15" font-weight="700" fill="#0B7285">1</text>
+  <text class="t" x="94" y="108" fill="#ffffff">Wired LAN</text>
+  <text class="s" x="94" y="126" fill="#d7eef1">ether1 · route distance 1</text>
+  <text class="s" x="94" y="144" fill="#d7eef1">RJ45 wall port / desk switch</text>
+  <text class="cap" x="94" y="160" fill="#bfe0e4">Highest priority — always wins if plugged in</text>
+
+  <!-- Priority 2: Venue Wi-Fi -->
+  <rect x="30" y="188" width="230" height="80" rx="12" fill="#ffffff" stroke="#0B7285" stroke-width="2"/>
+  <circle cx="66" cy="220" r="16" fill="#0B7285"/>
+  <text x="66" y="225" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">2</text>
+  <text class="t" x="94" y="216">Venue Wi-Fi</text>
+  <text class="s" x="94" y="234">wifi2 station · distance 10</text>
+  <text class="s" x="94" y="252">Hotel / café / airport SSID</text>
+
+  <!-- Priority 3: Hotspot -->
+  <rect x="30" y="290" width="230" height="80" rx="12" fill="#ffffff" stroke="#0B7285" stroke-width="2" stroke-dasharray="5 4"/>
+  <circle cx="66" cy="322" r="16" fill="#5f6b7a"/>
+  <text x="66" y="327" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">3</text>
+  <text class="t" x="94" y="318">Phone hotspot</text>
+  <text class="s" x="94" y="336">wifi2 station · fallback</text>
+  <text class="s" x="94" y="354">Your phone's personal hotspot</text>
+
+  <!-- down arrows -->
+  <line x1="145" y1="166" x2="145" y2="186" stroke="#0B7285" stroke-width="2" marker-end="url(#uf-arrow)"/>
+  <line x1="145" y1="268" x2="145" y2="288" stroke="#0B7285" stroke-width="2" marker-end="url(#uf-arrow)"/>
+  <text class="cap" x="152" y="180">if no cable</text>
+  <text class="cap" x="152" y="282">if Wi-Fi dead</text>
+
+  <!-- Logic panel -->
+  <rect x="320" y="80" width="470" height="290" rx="12" fill="#F0F9FA" stroke="#cbd5e1" stroke-width="1.5"/>
+  <text class="t" x="344" y="112">How it decides</text>
+
+  <circle cx="352" cy="140" r="4" fill="#0B7285"/>
+  <text class="s" x="366" y="144">ether1 carries the route at distance 1; wifi2 at distance 10.</text>
+  <circle cx="352" cy="166" r="4" fill="#0B7285"/>
+  <text class="s" x="366" y="170">RouterOS always uses the lowest-distance uplink that has a</text>
+  <text class="s" x="366" y="186">reachable gateway — so a plugged-in cable instantly wins.</text>
+  <circle cx="352" cy="212" r="4" fill="#0B7285"/>
+  <text class="s" x="366" y="216">check-gateway=ping withdraws ether1 the moment the cable is</text>
+  <text class="s" x="366" y="232">unplugged, falling back to wireless automatically.</text>
+  <circle cx="352" cy="258" r="4" fill="#0B7285"/>
+  <text class="s" x="366" y="262">WAN-Watchdog pings 8.8.8.8 every 30 s. If the current wireless</text>
+  <text class="s" x="366" y="278">uplink is dead it flips wifi2 to the other profile.</text>
+  <circle cx="352" cy="304" r="4" fill="#0B7285"/>
+  <text class="s" x="366" y="308">Probe-Venue runs every 15 min to climb back to venue Wi-Fi,</text>
+  <text class="s" x="366" y="324">so you stop burning phone data as soon as it recovers.</text>
+
+  <rect x="344" y="338" width="422" height="22" rx="11" fill="#0B7285"/>
+  <text x="555" y="353" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Self-healing · no manual switching needed</text>
+</svg>

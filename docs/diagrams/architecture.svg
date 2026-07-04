@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 430" font-family="Inter,Segoe UI,Helvetica,Arial,sans-serif">
+  <defs>
+    <marker id="ap-arrow" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#0B7285"/>
+    </marker>
+  </defs>
+  <style>
+    .box{fill:#ffffff;stroke:#0B7285;stroke-width:2}
+    .zone{fill:none;stroke:#94a3b8;stroke-width:1.5;stroke-dasharray:4 5}
+    .zt{font-size:13px;font-weight:700;fill:#334155;letter-spacing:.04em}
+    .t{font-size:13px;font-weight:700;fill:#1f2933}
+    .s{font-size:11px;fill:#5f6b7a}
+    .pt{font-size:11px;font-weight:700;fill:#ffffff;letter-spacing:.03em}
+    .lbl{font-size:11px;fill:#0B7285;font-weight:700}
+    .flow{stroke:#0B7285;stroke-width:2.5;fill:none}
+  </style>
+
+  <!-- TRAVEL ZONE -->
+  <rect class="zone" x="16" y="46" width="286" height="360" rx="14"/>
+  <text class="zt" x="32" y="72">TRAVEL NETWORK</text>
+  <text class="s" x="32" y="90">Hotel · café · airport · client site</text>
+
+  <rect class="box" x="36" y="108" width="118" height="50" rx="10"/>
+  <text class="t" x="95" y="131" text-anchor="middle">Laptop</text>
+  <text class="s" x="95" y="147" text-anchor="middle">192.168.20.x</text>
+  <rect class="box" x="166" y="108" width="118" height="50" rx="10"/>
+  <text class="t" x="225" y="131" text-anchor="middle">Phone / TV</text>
+  <text class="s" x="225" y="147" text-anchor="middle">192.168.20.x</text>
+
+  <rect class="box" x="66" y="214" width="188" height="84" rx="10"/>
+  <text class="t" x="160" y="240" text-anchor="middle">MikroTik hAP ax2</text>
+  <text class="s" x="160" y="258" text-anchor="middle">WireGuard client</text>
+  <text class="s" x="160" y="274" text-anchor="middle">SSID: AnchorPoint Home Network</text>
+  <text class="s" x="160" y="290" text-anchor="middle">LAN 192.168.20.1/24</text>
+  <line x1="160" y1="158" x2="160" y2="212" class="flow" marker-end="url(#ap-arrow)"/>
+
+  <rect x="36" y="326" width="248" height="66" rx="10" fill="#F0F9FA" stroke="#0B7285" stroke-width="1.5"/>
+  <text class="lbl" x="48" y="346">UPLINK — best available</text>
+  <text class="s" x="48" y="365">1 · Wired LAN (ether1)</text>
+  <text class="s" x="48" y="381">2 · Venue Wi-Fi → 3 · Phone hotspot (wifi2)</text>
+  <line x1="160" y1="298" x2="160" y2="324" class="flow" marker-end="url(#ap-arrow)"/>
+
+  <!-- INTERNET -->
+  <ellipse cx="440" cy="250" rx="70" ry="44" fill="#eef2f6" stroke="#94a3b8" stroke-width="1.5"/>
+  <text class="zt" x="440" y="255" text-anchor="middle" fill="#64748b">INTERNET</text>
+  <line x1="254" y1="256" x2="372" y2="252" class="flow"/>
+  <line x1="508" y1="252" x2="588" y2="256" class="flow" marker-end="url(#ap-arrow)"/>
+
+  <!-- tunnel banner -->
+  <rect x="352" y="120" width="176" height="28" rx="14" fill="#0B7285"/>
+  <text class="pt" x="440" y="138" text-anchor="middle">WireGuard tunnel · UDP 443</text>
+  <line x1="440" y1="148" x2="440" y2="204" stroke="#0B7285" stroke-width="1.5" stroke-dasharray="3 3"/>
+
+  <!-- HOME ZONE -->
+  <rect class="zone" x="578" y="46" width="286" height="360" rx="14"/>
+  <text class="zt" x="594" y="72">HOME NETWORK</text>
+  <text class="s" x="594" y="90">Your house / office — the EXIT POINT</text>
+
+  <rect class="box" x="612" y="108" width="216" height="50" rx="10" fill="#F0F9FA"/>
+  <text class="t" x="720" y="131" text-anchor="middle">The whole internet</text>
+  <text class="s" x="720" y="147" text-anchor="middle">reached as if you were at home</text>
+
+  <rect class="box" x="612" y="214" width="216" height="84" rx="10"/>
+  <text class="t" x="720" y="240" text-anchor="middle">FRITZ!Box / Linux</text>
+  <text class="s" x="720" y="258" text-anchor="middle">WireGuard server · listens UDP 443</text>
+  <text class="s" x="720" y="274" text-anchor="middle">DDNS hostname</text>
+  <text class="s" x="720" y="290" text-anchor="middle">Tunnel 10.0.80.1/24</text>
+
+  <rect x="612" y="326" width="216" height="52" rx="10" fill="#F0F9FA" stroke="#0B7285" stroke-width="1.5"/>
+  <text class="lbl" x="720" y="348" text-anchor="middle">Home internet line</text>
+  <text class="s" x="720" y="366" text-anchor="middle">Your home IP · your home DNS</text>
+
+  <line x1="720" y1="298" x2="720" y2="324" class="flow" marker-end="url(#ap-arrow)"/>
+  <path d="M720 326 C 604 300, 604 180, 712 160" class="flow" stroke-dasharray="4 4" marker-end="url(#ap-arrow)"/>
+</svg>

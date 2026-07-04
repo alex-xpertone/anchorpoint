@@ -1,0 +1,35 @@
+# AnchorPoint — WireGuard client config (TRAVEL ROUTER side)
+# Exported from your home WireGuard server (FRITZ!Box or Linux).
+# Replace every <PLACEHOLDER> with your own values. NEVER commit real keys.
+
+[Interface]
+# This travel router's tunnel address. Home server is 10.0.80.1.
+PrivateKey = <CLIENT_PRIVATE_KEY>
+Address    = 10.0.80.3/24
+# Resolve DNS through home so it never leaks to the venue network.
+DNS        = 10.0.80.1
+
+[Peer]
+PublicKey = <SERVER_PUBLIC_KEY>
+# Your home DDNS hostname on UDP/443 (looks like HTTPS => firewall-friendly).
+Endpoint  = home.example.myfritz.net:443
+# Full tunnel: ALL traffic exits at home (home = exit point).
+# For split tunnel, replace with your home subnets, e.g. 10.0.80.0/24,192.168.178.0/24
+AllowedIPs          = 0.0.0.0/0, ::/0
+PersistentKeepalive = 25
+
+# -----------------------------------------------------------------------------
+# HOME SERVER side (Linux reference — /etc/wireguard/wg0.conf). FRITZ!Box users
+# configure this in the web UI instead; see docs/02.
+#
+# [Interface]
+# Address    = 10.0.80.1/24
+# ListenPort = 443
+# PrivateKey = <SERVER_PRIVATE_KEY>
+# PostUp   = iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE; sysctl -w net.ipv4.ip_forward=1
+# PostDown = iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+#
+# [Peer]                       # the MikroTik travel router
+# PublicKey  = <CLIENT_PUBLIC_KEY>
+# AllowedIPs = 10.0.80.3/32
+# -----------------------------------------------------------------------------
