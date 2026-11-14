@@ -6,9 +6,9 @@
 #   this file --gen-mesh-secrets.py--> secrets/example.sops.yaml (encrypted keys)
 #             --render-mesh.py-------> deployments/<node>/bootstrap.sensitive.rsc
 #
-# 2 to 4 locations. Each node has a short identifier (its `color` field — a city
-# name here, but any short label works: it drives interface/table names, device
-# identity, secret keys and the output folder). Keep `index` contiguous 1..N.
+# Two locations. Each site has a short identifier (its `color` field — a city name
+# here, but any short label works: it drives interface/table names, device identity,
+# secret keys and the output folder). Keep the two indices as 1 and 2.
 #
 # Per-site port map (hAP ax2): ether1 = WAN · ether2 = exit via the other site ·
 # ether3/4/5 = local network · Wi-Fi: own SSID = local, other site's SSID = exit.
@@ -17,8 +17,7 @@
 mesh:
   name: anchorpoint
   overlay_subnet: 10.0.80.0/24
-  wg_port_base: 51823            # fallback: derives per-pair ports for a 3-4 site mesh
-  wg_port: 51820                 # explicit UDP port for a 2-site link (both ends)
+  wg_port: 51820                 # the WireGuard UDP port (both ends)
   wifi_ssid_prefix: AnchorPoint  # SSID = AnchorPoint-<ssid_suffix> per site
   timezone: UTC
   secrets_file: secrets/example.sops.yaml   # generated (encrypted); gitignored
@@ -42,5 +41,5 @@ nodes:
     ssid_suffix: BCN                   # -> SSID "AnchorPoint-BCN"
     wg_public_key: REPLACE_barcelona_public_key
 
-# For a 3rd/4th site: append a node block (index 3, 4 with its own id / location /
-# ddns / ssid_suffix) and REMOVE mesh.wg_port so per-pair ports derive automatically.
+# Both sites must be reachable at their `ddns` endpoint (public IP or DDNS), and each
+# site's ISP router must forward UDP wg_port to it. See docs/ONBOARDING.md.
