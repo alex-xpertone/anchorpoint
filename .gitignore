@@ -27,6 +27,9 @@ deployments/
 # --- Rendered diagrams (regenerate from .d2) ---
 *.svg
 *.png
+# ...but DO keep the committed sample output under examples/
+!examples/**/*.svg
+!examples/**/*.png
 
 # --- Python ---
 .venv/
