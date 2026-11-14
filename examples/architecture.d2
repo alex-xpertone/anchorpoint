@@ -1,21 +1,21 @@
 # AnchorPoint Mesh — anchorpoint   # Render: scripts/render-diagrams.sh deployments/mesh/architecture.d2
 
 title: |md
-  # AnchorPoint Mesh — anchorpoint
+  # AnchorPoint · 2-site link
 point-to-point WireGuard link · overlay 10.0.80.0/24 · every node is also an exit
 | {near: top-center}
 
 hamburg: Hamburg · DE {
   style.fill: "#d6e4ff"
   id: "HAMBURG  (10.0.80.1)"
-  local: "local: AnchorPoint-HAM\n192.168.10.0/24"
-  exits: "exits via 1 peers\nports 3..3"
+  local: "local: AnchorPoint-HAM\n192.168.10.0/24 · ether3/ether4/ether5"
+  exits: "exit via 1 peer(s)\nether2 + Wi-Fi"
 }
 barcelona: Barcelona · ES {
   style.fill: "#d6f5d6"
   id: "BARCELONA  (10.0.80.2)"
-  local: "local: AnchorPoint-BCN\n192.168.20.0/24"
-  exits: "exits via 1 peers\nports 3..3"
+  local: "local: AnchorPoint-BCN\n192.168.20.0/24 · ether3/ether4/ether5"
+  exits: "exit via 1 peer(s)\nether2 + Wi-Fi"
 }
 
 # One WireGuard tunnel per unordered pair (dedupe: this.index < remote.index)
