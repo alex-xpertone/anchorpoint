@@ -2,7 +2,7 @@
 # Render: scripts/render-diagrams.sh deployments/mesh/architecture.d2
 
 title: |md
-  # AnchorPoint Mesh — {{ mesh.name }}
+  # AnchorPoint · {{ nodes|length }}-site link
   {% if nodes|length == 2 %}point-to-point WireGuard link · {% else %}{{ nodes|length }}-node full WireGuard mesh · {% endif %}overlay {{ mesh.overlay_subnet }} · every node is also an exit
 | {near: top-center}
 
@@ -12,8 +12,8 @@ title: |md
 {{ n.color }}: {{ n.location }} · {{ n.country }} {
   style.fill: "{{ cycle[(n.index - 1) % (cycle | length)] }}"
   id: "{{ n.color | upper }}  (10.0.80.{{ n.index }})"
-  local: "local: {{ n.ssid }}\n192.168.{{ n.index * 10 }}.0/24"
-  exits: "exits via {{ n.exits | length }} peers\nports 3..{{ 2 + n.exits|length }}"
+  local: "local: {{ n.ssid }}\n192.168.{{ n.index * 10 }}.0/24 · {{ n.local_ethers | join('/') }}"
+  exits: "exit via {{ n.exits | length }} peer(s)\n{{ n.exits | map(attribute='ether') | join(', ') }} + Wi-Fi"
 }
 {% endfor %}
 

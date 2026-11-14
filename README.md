@@ -12,6 +12,8 @@ Built for MikroTik RouterOS v7 (hAP ax2 and similar). Validated on RouterOS CHR
 Each site has a short **identifier** (a city, a code — any short label), used for its
 interface names, routing table, device identity and secret keys.
 
+![AnchorPoint — two-site architecture: local (wired + Wi-Fi) vs tunneled exit, the WireGuard tunnel, leak-proof fail-closed, and the netwatch self-heal](docs/architecture.svg)
+
 ---
 
 ## How it works
