@@ -1,0 +1,32 @@
+# AnchorPoint Mesh — {{ mesh.name }}   {# rendered from templates/mesh-diagram.d2.j2 #}
+# Render: scripts/render-diagrams.sh deployments/mesh/architecture.d2
+
+title: |md
+  # AnchorPoint Mesh — {{ mesh.name }}
+  {% if nodes|length == 2 %}point-to-point WireGuard link · {% else %}{{ nodes|length }}-node full WireGuard mesh · {% endif %}overlay {{ mesh.overlay_subnet }} · every node is also an exit
+| {near: top-center}
+
+{# node fill: an index-based pastel palette (works for any node identifier) #}
+{% set cycle = ['#d6e4ff', '#d6f5d6', '#ffd6d6', '#fff4c2', '#e8d6ff', '#d6f5f0'] %}
+{% for n in nodes %}
+{{ n.color }}: {{ n.location }} · {{ n.country }} {
+  style.fill: "{{ cycle[(n.index - 1) % (cycle | length)] }}"
+  id: "{{ n.color | upper }}  (10.0.80.{{ n.index }})"
+  local: "local: {{ n.ssid }}\n192.168.{{ n.index * 10 }}.0/24"
+  exits: "exits via {{ n.exits | length }} peers\nports 3..{{ 2 + n.exits|length }}"
+}
+{% endfor %}
+
+# One WireGuard tunnel per unordered pair (dedupe: this.index < remote.index)
+{% for n in nodes %}
+{% for x in n.exits %}
+{% if n.index < (x.remote_wg_ip.split('.')[-1] | int) %}
+{{ n.color }} <-> {{ x.color }}: "UDP {{ x.pair_port }}" {style.stroke-dash: 3}
+{% endif %}
+{% endfor %}
+{% endfor %}
+
+note: |md
+  Each edge is a WireGuard tunnel on its own UDP port (both ends forward it).
+  Plug into a node's exit port / join its exit SSID to browse from that country.
+| {near: bottom-center}

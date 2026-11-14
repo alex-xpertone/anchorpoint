@@ -1,0 +1,47 @@
+# ============================================================================
+# anchorpoint — .gitignore
+# Secrets and generated per-deployment configs NEVER go in the repo.
+# Each operator generates their own (unique) keys/passwords locally.
+# ============================================================================
+
+# --- Secrets (your real values; keep ONLY the *.example in git) ---
+secrets/*.sops.yaml
+secrets/*.yaml
+!secrets/*.example
+*.sops.yaml
+*.dec.yaml
+*.plain.yaml
+*.decrypted*
+
+# --- age / GPG / TLS private key material — never in the repo ---
+*.agekey
+*.age
+*.key
+*.pem
+key.txt
+keys.txt
+
+# --- Generated per-node output (rendered from your inventory + secrets) ---
+deployments/
+
+# --- Rendered diagrams (regenerate from .d2) ---
+*.svg
+*.png
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# --- env ---
+.env
+.env.*
+!.env.example
+
+# --- OS / editor ---
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/

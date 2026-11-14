@@ -1,0 +1,42 @@
+# 🔧 AnchorPoint Mesh — Installer Card
+
+## {{ node.color | upper }} · {{ node.location }} ({{ node.country }})
+
+| | |
+|---|---|
+| **Router hostname** | `mesh-{{ node.color }}` |
+| **Overlay IP** | `{{ node.wg_ip }}` |
+| **This node's DDNS** | `{{ node.ddns }}` |
+| **Admin password / Wi-Fi password** | in the SOPS bundle (`{{ node.color }}_admin_password`, `{{ node.color }}_wifi_passphrase`) |
+
+---
+
+### 🔌 Cable & Wi-Fi map — plug clients in here
+| Port | Wi-Fi SSID | You appear in | Client subnet |
+|:----:|-----------|---------------|---------------|
+| **1** | — | *(WAN uplink to the ISP modem)* | — |
+| **2** | `{{ node.ssid }}` | **{{ node.location }}** (local ISP) | `{{ node.local_subnet }}` |
+{% for x in node.exits %}
+| **{{ x.ether[-1] }}** | `{{ x.ssid }}` | **{{ x.location }}** (via {{ x.color | upper }}) | `{{ x.subnet }}` |
+{% endfor %}
+
+---
+
+### 📡 Port-forward on THIS site's ISP router → the router's WAN IP
+{% for x in node.exits %}
+- **UDP {{ x.pair_port }}**  — WireGuard tunnel {{ node.color }} ↔ {{ x.color }} ({{ x.location }})
+{% endfor %}
+> All ports are UDP. Each is forwarded on **both** ends of its tunnel.
+
+---
+
+### 🚀 Install steps
+1. **Factory-reset** the MikroTik hAP ax2. Plug the ISP uplink into **Port 1**.
+2. Decrypt & paste this node's config (WinBox → *New Terminal*):
+   `sops -d --input-type binary --output-type binary deployments/mesh/{{ node.id }}/bootstrap.sensitive.rsc`
+3. Add the **UDP port-forward(s)** above on the site's ISP router.
+4. Verify: `/interface wireguard peers print` → **{{ node.exits | length }}** peer(s) with a recent handshake;
+   `/tool netwatch print` → all watchdogs **up**.
+5. Test each exit: connect to a port/SSID above and confirm your public IP is that country's.
+
+*Mesh: {{ mesh.name }} · {{ nodes | length }} nodes · overlay {{ mesh.overlay_subnet }} · generated — do not hand-edit.*
