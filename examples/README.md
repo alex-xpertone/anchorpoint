@@ -5,9 +5,10 @@ These are **sample** files produced by `render-mesh.py` from the two-site exampl
 can see exactly what the tool generates before you run it.
 
 > ⚠️ **The secret values here are fake placeholders, not real credentials.** Every key,
-> password and passphrase reads like `EXAMPLE-…-NOT-A-REAL-KEY` / `…-NOT-REAL`, and the
-> endpoints are `*.example.net`. They are deliberately un-key-like so they can't be
-> mistaken for secrets — they cannot be used and must never be deployed.
+> password, passphrase and the DuckDNS token read like `EXAMPLE-…-NOT-A-REAL-KEY` /
+> `…-NOT-REAL`, and the endpoints are example DuckDNS names (`anchorpoint-<city>.duckdns.org`).
+> They are deliberately un-key-like so they can't be mistaken for secrets — they cannot be
+> used and must never be deployed.
 
 ## In a real run (how it actually works)
 - `gen-mesh-secrets.py` generates a **unique, random** keypair + admin password + Wi-Fi

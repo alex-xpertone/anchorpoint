@@ -22,40 +22,48 @@ export AGE_RECIPIENT=age1...                       # your age PUBLIC key   (encr
 
 ---
 
-## Phase 0 — collect each site's endpoint (⚠ you need both before rendering)
-Each site's config points at the **other** site's endpoint, so both must exist first.
-Both sites are servers, so both must be reachable from the internet.
+## Phase 0 — register DuckDNS + check for CGNAT (⚠ do this before rendering)
+Each site advertises itself with a free **DuckDNS** name (home/office public IPs change),
+and each site's config points at the **other** site's name — so both must exist first. Both
+sites are servers, so both must be reachable from the internet.
+
+1. At [duckdns.org](https://www.duckdns.org), sign in and **register one subdomain per site**
+   (e.g. `anchorpoint-hamburg`, `anchorpoint-barcelona`). Copy your account **token** (one
+   token covers all your subdomains) — you set it in the inventory once.
 
 For **each** of the two sites:
-1. Factory-reset the hAP ax2, give it internet on `ether1`.
-2. Enable DDNS and read the name:
-   ```
-   /ip cloud set ddns-enabled=yes
-   /ip cloud print          # dns-name -> this site's ddns
-   ```
+
+2. Factory-reset the hAP ax2, give it internet on `ether1`.
 3. Note the serial: `/system routerboard print` (field `serial-number`).
 4. **CGNAT check** — a site behind carrier NAT can't accept inbound tunnels:
    ```
+   /ip cloud set ddns-enabled=yes
    /ip cloud print          # compare public-address to the WAN interface address
    ```
    If `public-address` is in `100.64.0.0/10` or is private → that site is behind CGNAT.
    Two CGNAT'd sites cannot connect to each other — make sure at least one has a public IP
    (the other can initiate and keepalive holds the tunnel).
 
-Put each site's DDNS into `ddns:` in your inventory. (Serials aren't in the config; keep them in your asset record.)
+Put each site's subdomain into `duckdns_subdomain:` and your token into `duckdns_token:`
+(next phase). The generated config keeps each name pointed at its live IP automatically.
+(Serials aren't in the config; keep them in your asset record.)
 
 ---
 
 ## Phase 1 — inventory
 ```bash
-cp inventory/example.yaml inventory/my-link.yaml
+cp inventory/example.yaml inventory/my-link.yaml          # my-link.yaml is gitignored
 ```
 Edit the two node blocks:
-- Set each `ddns:` (from Phase 0) and `ssid_suffix:` (its Wi-Fi name = `wifi_ssid_prefix`-`suffix`).
-- Set `wg_port:` (the UDP port both ends use).
-- Leave `wg_public_key:` as `REPLACE_...` — the generator fills it.
+- Set each `duckdns_subdomain:` (from Phase 0) and `ssid_suffix:` (its Wi-Fi name =
+  `wifi_ssid_prefix`-`suffix`). The endpoint `ddns:` is **derived** from the subdomain — leave it.
+- Set `wg_port:` (the UDP port both ends use) and `duckdns_token:` (your DuckDNS account token).
+- Leave `wg_public_key:` and the `clients:` keys as `REPLACE_...` — the generator fills them.
 
 Everything else (subnets, port layout, routes) is **derived** — don't hand-edit.
+
+> Your real `my-link.yaml` holds the token (until the next phase moves it) plus endpoints and
+> public keys, so it's gitignored — only `inventory/example.yaml` is committed.
 
 ---
 
@@ -66,8 +74,9 @@ scripts/gen-mesh-secrets.py --inventory inventory/my-link.yaml --list    # inspe
 ```
 Generates each site's keypair (offline X25519), writes **private** keys +
 admin/wifi passwords into `secrets/<name>.sops.yaml` (SOPS-encrypted, gitignored) and
-the **public** keys into the inventory. Re-runs never overwrite; `--rotate <name>`
-regenerates one site.
+the **public** keys into the inventory. It also **moves your `duckdns_token`** from the
+inventory into the encrypted bundle and blanks it in the inventory (no plaintext token is
+left behind). Re-runs never overwrite; `--rotate <name>` regenerates one site.
 
 ---
 
@@ -117,6 +126,9 @@ For each of the two sites:
 | Hamburg   | `wg_port` (↔ Barcelona) · `wg_client_port` (iPhone/MacBook) |
 | Barcelona | `wg_port` (↔ Hamburg) · `wg_client_port` (iPhone/MacBook) |
 
+> DuckDNS updates run **outbound** from the router (a 5-min `/system scheduler`) — **no
+> port-forward** is needed for the `*.duckdns.org` names.
+
 ---
 
 ## Phase 6 — verify the live link
@@ -150,7 +162,8 @@ can test a site from your own devices — full tunnel, so you exit at that site.
 |------|-----|
 | Inspect keys | `scripts/gen-mesh-secrets.py --inventory <inv> --list` |
 | Rotate a site's key | `gen-mesh-secrets.py --rotate <name>` → re-render → re-flash **both** sites (each holds the other's public key) |
-| Change a DDNS | edit inventory `ddns:` → re-render → re-flash both sites |
+| Change a site's DuckDNS name | edit its `duckdns_subdomain:` → re-render → re-flash both sites |
+| Change the DuckDNS token | `sops set secrets/<name>.sops.yaml '["duckdns_token"]' '"<token>"'` → re-render |
 | Edit any secret | `sops secrets/<name>.sops.yaml` |
 | Add / rotate a test device | edit `mesh.clients` (or `--rotate <site>`) → re-render → re-import the new `clients/<device>.sensitive.conf` |
 
@@ -159,9 +172,10 @@ can test a site from your own devices — full tunnel, so you exit at that site.
 ## What lives where
 | Kind | Location | In git? |
 |------|----------|---------|
-| Sites, DDNS, SSIDs, PUBLIC keys, subnets (derived) | `inventory/*.yaml` | ✅ plaintext |
+| Example inventory (placeholders) | `inventory/example.yaml` | ✅ plaintext |
+| Your real inventory: subdomains, SSIDs, PUBLIC keys, subnets (+ token until Phase 2) | `inventory/my-link.yaml` | ❌ gitignored |
 | Example secrets file (placeholders only) | `secrets/*.sops.yaml.example` | ✅ |
-| PRIVATE keys, admin/wifi passwords (your real values) | `secrets/*.sops.yaml` | ❌ gitignored |
+| PRIVATE keys, admin/wifi passwords, **DuckDNS token** (your real values) | `secrets/*.sops.yaml` | ❌ gitignored |
 | Rendered configs (redacted + encrypted) | `deployments/<site>/…` | ❌ gitignored |
 | Per-device client configs (encrypted) | `deployments/<site>/clients/*.sensitive.conf` | ❌ gitignored |
 | age private key | `~/.age/keys.txt` | ❌ never |

@@ -6,7 +6,7 @@
 |---|---|
 | **Router hostname** | `mesh-hamburg` |
 | **Overlay IP** | `10.0.80.1` |
-| **This site's DDNS** | `hamburg.example.net` |
+| **This site's DDNS** | `anchorpoint-hamburg.duckdns.org` |
 | **Admin / Wi-Fi password** | in the SOPS bundle (`hamburg_admin_password`, `hamburg_wifi_passphrase`) |
 
 ---
@@ -26,6 +26,7 @@
 - **UDP 51820** — WireGuard tunnel hamburg ↔ barcelona (Barcelona)
 - **UDP 51821** — roaming test clients (iphone, macbook)
 > All ports are UDP. Tunnel ports are forwarded on **both** ends of each tunnel.
+> **DDNS:** `anchorpoint-hamburg.duckdns.org` is kept current by DuckDNS (a scheduler on the router updates it every 5 min, outbound) — **no port-forward** needed for it.
 
 ---
 

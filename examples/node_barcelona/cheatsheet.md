@@ -6,7 +6,7 @@
 |---|---|
 | **Router hostname** | `mesh-barcelona` |
 | **Overlay IP** | `10.0.80.2` |
-| **This site's DDNS** | `barcelona.example.net` |
+| **This site's DDNS** | `anchorpoint-barcelona.duckdns.org` |
 | **Admin / Wi-Fi password** | in the SOPS bundle (`barcelona_admin_password`, `barcelona_wifi_passphrase`) |
 
 ---
@@ -26,6 +26,7 @@
 - **UDP 51820** — WireGuard tunnel barcelona ↔ hamburg (Hamburg)
 - **UDP 51821** — roaming test clients (iphone, macbook)
 > All ports are UDP. Tunnel ports are forwarded on **both** ends of each tunnel.
+> **DDNS:** `anchorpoint-barcelona.duckdns.org` is kept current by DuckDNS (a scheduler on the router updates it every 5 min, outbound) — **no port-forward** needed for it.
 
 ---
 

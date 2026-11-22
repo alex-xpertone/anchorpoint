@@ -50,6 +50,22 @@
 {% for e in node.local_ethers %}
 /interface bridge port remove [find interface={{ e }}]
 {% endfor %}
+{% if node.duckdns_subdomain %}
+
+#------------------------------------------------------------------------------
+# 1b. DYNAMIC DNS (DuckDNS) — keep {{ node.duckdns_subdomain }}.duckdns.org on this WAN IP
+#     A scheduler re-publishes the current public IP every 5 min (and at boot) so
+#     the remote site and your roaming clients can always resolve this endpoint.
+#     check-certificate=no: RouterOS ships no CA bundle by default; the update still
+#     travels over TLS. Import the CA and flip this to =yes for strict validation.
+#------------------------------------------------------------------------------
+/system script add name=duckdns-update dont-require-permissions=yes \
+    comment="DuckDNS: keep {{ node.duckdns_subdomain }}.duckdns.org pointed here" \
+    source="/tool fetch url=\"https://www.duckdns.org/update?domains={{ node.duckdns_subdomain }}&token={{ secrets['duckdns_token'] }}&ip=\" mode=https check-certificate=no keep-result=no"
+/system scheduler add name=duckdns-update interval=5m start-time=startup \
+    on-event="/system script run duckdns-update" comment="DuckDNS refresh (5 min)"
+/system script run duckdns-update
+{% endif %}
 
 #------------------------------------------------------------------------------
 # 2. OVERLAY IDENTITY  (stable 10.0.80.x — tunnel source + watchdog target)

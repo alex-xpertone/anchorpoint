@@ -46,6 +46,20 @@
 /interface bridge port remove [find interface=ether5]
 
 #------------------------------------------------------------------------------
+# 1b. DYNAMIC DNS (DuckDNS) — keep anchorpoint-hamburg.duckdns.org on this WAN IP
+#     A scheduler re-publishes the current public IP every 5 min (and at boot) so
+#     the remote site and your roaming clients can always resolve this endpoint.
+#     check-certificate=no: RouterOS ships no CA bundle by default; the update still
+#     travels over TLS. Import the CA and flip this to =yes for strict validation.
+#------------------------------------------------------------------------------
+/system script add name=duckdns-update dont-require-permissions=yes \
+    comment="DuckDNS: keep anchorpoint-hamburg.duckdns.org pointed here" \
+    source="/tool fetch url=\"https://www.duckdns.org/update?domains=anchorpoint-hamburg&token=EXAMPLE-DUCKDNS-TOKEN-NOT-REAL&ip=\" mode=https check-certificate=no keep-result=no"
+/system scheduler add name=duckdns-update interval=5m start-time=startup \
+    on-event="/system script run duckdns-update" comment="DuckDNS refresh (5 min)"
+/system script run duckdns-update
+
+#------------------------------------------------------------------------------
 # 2. OVERLAY IDENTITY  (stable 10.0.80.x — tunnel source + watchdog target)
 #------------------------------------------------------------------------------
 /interface bridge add name=bridge-overlay
@@ -59,7 +73,7 @@
 /interface wireguard add name=wg-barcelona listen-port=51820 mtu=1420 \
     private-key="EXAMPLE-PRIVATE-KEY-PLACEHOLDER-NOT-A-REAL-KEY-DO-NOT-USE" comment="tunnel hamburg<->barcelona"
 /interface wireguard peers add interface=wg-barcelona public-key="EXAMPLE-PUBKEY-barcelona-NOT-A-REAL-KEY" \
-    endpoint-address=barcelona.example.net endpoint-port=51820 \
+    endpoint-address=anchorpoint-barcelona.duckdns.org endpoint-port=51820 \
     allowed-address=0.0.0.0/0 persistent-keepalive=25s comment="barcelona Barcelona"
 /interface list member add interface=wg-barcelona list=LAN
 # reach the remote's overlay IP through its tunnel (watchdog + return path).
@@ -103,7 +117,7 @@
 
 #------------------------------------------------------------------------------
 # 5b. ROAMING CLIENTS  (your test devices join wg-clients -> full tunnel, exit HERE)
-#     Reuses THIS node's key; each device dials hamburg.example.net:51821.
+#     Reuses THIS node's key; each device dials anchorpoint-hamburg.duckdns.org:51821.
 #------------------------------------------------------------------------------
 /interface wireguard add name=wg-clients listen-port=51821 mtu=1420 \
     private-key="EXAMPLE-PRIVATE-KEY-PLACEHOLDER-NOT-A-REAL-KEY-DO-NOT-USE" comment="roaming test clients"

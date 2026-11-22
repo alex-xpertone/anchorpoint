@@ -13,6 +13,12 @@ secrets/*.yaml
 *.plain.yaml
 *.decrypted*
 
+# --- Your real inventory (holds endpoints + public keys, and the DuckDNS token
+#     before gen-mesh-secrets.py moves it into the encrypted bundle). Keep ONLY
+#     the example in git. ---
+inventory/*.yaml
+!inventory/example.yaml
+
 # --- age / GPG / TLS private key material — never in the repo ---
 *.agekey
 *.age

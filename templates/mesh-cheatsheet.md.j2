@@ -34,6 +34,9 @@
 - **UDP {{ node.client_port }}** — roaming test clients ({{ node.client_peers | map(attribute='name') | join(', ') }})
 {% endif %}
 > All ports are UDP. Tunnel ports are forwarded on **both** ends of each tunnel.
+{% if node.duckdns_subdomain %}
+> **DDNS:** `{{ node.ddns }}` is kept current by DuckDNS (a scheduler on the router updates it every 5 min, outbound) — **no port-forward** needed for it.
+{% endif %}
 
 ---
 

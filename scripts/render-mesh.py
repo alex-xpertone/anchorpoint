@@ -101,7 +101,8 @@ def enrich(mesh: dict, nodes: list[dict]) -> list[dict]:
     client_port = mesh.get("wg_client_port", 51821)   # UDP port each node serves its clients on
     nodes = sorted(nodes, key=lambda n: n["index"])
     by_index = {n["index"]: n for n in nodes}
-    # resolve each node's SSID: prefix + per-node suffix, else a full `ssid`
+    # resolve each node's SSID: prefix + per-node suffix, else a full `ssid`;
+    # and derive the public endpoint from DuckDNS when a subdomain is given.
     for n in nodes:
         suffix = n.get("ssid_suffix")
         if suffix is not None:
@@ -109,6 +110,13 @@ def enrich(mesh: dict, nodes: list[dict]) -> list[dict]:
         elif "ssid" not in n:
             sys.exit(f"node {n.get('id', n.get('index'))}: give ssid_suffix "
                      f"(with mesh.wifi_ssid_prefix) or a full ssid")
+        # DDNS: the site endpoint IS its DuckDNS name (<subdomain>.duckdns.org).
+        sub = n.get("duckdns_subdomain")
+        if sub:
+            n["ddns"] = f"{sub}.duckdns.org"
+        elif "ddns" not in n:
+            sys.exit(f"node {n.get('id', n.get('index'))}: give duckdns_subdomain "
+                     f"or a static ddns endpoint")
     if explicit_port is not None and len(nodes) != 2:
         sys.exit("mesh.wg_port sets one shared port and is only valid for a 2-node "
                  "link; for >2 nodes drop it and let wg_port_base derive per-pair ports")

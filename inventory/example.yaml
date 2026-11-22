@@ -14,6 +14,10 @@
 # ether3/4/5 = local network · Wi-Fi: own SSID = local, other site's SSID = exit.
 # Plus per site: a wg-clients interface (UDP wg_client_port) for your roaming test
 # devices (iPhone + MacBook) — full tunnel, so each device exits at that site.
+#
+# DDNS: each site keeps its public endpoint reachable via DuckDNS — set a
+# `duckdns_subdomain` per node and one `duckdns_token` for the account (below); the
+# router refreshes it every 5 min. The endpoint `ddns` is then derived automatically.
 # =============================================================================
 
 mesh:
@@ -23,6 +27,8 @@ mesh:
   wg_client_port: 51821          # UDP port each site serves its roaming test clients on
   clients: [iphone, macbook]     # per-site roaming devices (each gets its own WireGuard config)
   wifi_ssid_prefix: AnchorPoint  # SSID = AnchorPoint-<ssid_suffix> per site
+  duckdns_token: REPLACE_duckdns_token  # DuckDNS account token (input). gen-mesh-secrets.py
+                                        # encrypts it into the bundle and clears it here.
   timezone: UTC
   secrets_file: secrets/example.sops.yaml   # generated (encrypted); gitignored
 
@@ -32,7 +38,8 @@ nodes:
     index: 1
     location: Hamburg
     country: DE
-    ddns: REPLACE_hamburg_ddns         # this site's public endpoint (DDNS name / public IP)
+    ddns: anchorpoint-hamburg.duckdns.org   # site endpoint (auto = <duckdns_subdomain>.duckdns.org)
+    duckdns_subdomain: anchorpoint-hamburg  # DuckDNS name kept pointed here (token = mesh.duckdns_token)
     ssid_suffix: HAM                   # -> SSID "AnchorPoint-HAM"
     wg_public_key: REPLACE_hamburg_public_key   # filled by gen-mesh-secrets.py
     clients:                                    # roaming test devices (pubkeys filled by gen)
@@ -44,7 +51,8 @@ nodes:
     index: 2
     location: Barcelona
     country: ES
-    ddns: REPLACE_barcelona_ddns
+    ddns: anchorpoint-barcelona.duckdns.org
+    duckdns_subdomain: anchorpoint-barcelona
     ssid_suffix: BCN                   # -> SSID "AnchorPoint-BCN"
     wg_public_key: REPLACE_barcelona_public_key
     clients:
