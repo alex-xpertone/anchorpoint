@@ -51,6 +51,7 @@ So the port you plug into — or the SSID you join — decides which country you
 | Local LAN (SSID `<prefix>-<suffix>`) | `192.168.10.0/24` | `192.168.20.0/24` |
 | Exit subnet (traffic out via the other site) | `192.168.11.0/24` | `192.168.21.0/24` |
 | Tunnel | `UDP <wg_port>` — both ends | ← same |
+| Roaming clients (`wg-clients`, `UDP <wg_client_port>`) | `10.0.91.0/24` (iPhone `.2`, MacBook `.3`) | `10.0.92.0/24` |
 
 **Leak-proof:** the exit subnet is policy-routed into the tunnel with
 `action=lookup-only-in-table` — if the tunnel drops, exit traffic is **dropped, not
@@ -92,6 +93,10 @@ Each site gets `deployments/<site>/bootstrap.sensitive.rsc` (encrypted),
 Decrypt a site's config to a scratch file **outside the repo**, paste it into that
 router over a console/WinBox terminal, then shred the scratch file.
 
+Each site also gets `deployments/<site>/clients/<device>.sensitive.conf` — a ready
+WireGuard config per **test device** (iPhone, MacBook) to import on your phone/laptop
+(see [Test clients](#test-clients-iphone--macbook)).
+
 Full runbook — DDNS/CGNAT collection, port-forwarding, flashing, verification,
 day-2 ops — in **[docs/ONBOARDING.md](docs/ONBOARDING.md)**.
 
@@ -104,11 +109,32 @@ day-2 ops — in **[docs/ONBOARDING.md](docs/ONBOARDING.md)**.
 | `ssid_suffix` | per site | Wi-Fi SSID = `wifi_ssid_prefix` + `-` + suffix |
 | `wifi_ssid_prefix` | link | base SSID name |
 | `wg_port` | link | the WireGuard UDP port (both ends) |
+| `wg_client_port` | link | UDP port each site serves its roaming test clients on (default 51821) |
+| `clients` | link | roaming test devices per site, e.g. `[iphone, macbook]` — each gets its own config |
 
 (A site may instead carry a full `ssid` for back-compat; `ssid_suffix` wins when present.)
 
 > The `mesh:` block and the `mesh-*` script/template names are just the internal
 > tooling names — this builds a **two-site link**.
+
+## Test clients (iPhone + MacBook)
+
+Each site also serves a couple of **roaming WireGuard clients** on a dedicated
+`wg-clients` interface (`UDP <wg_client_port>`), so you can dial into a site from your own
+devices and verify it end-to-end. Each client is **full-tunnel**: once connected you browse
+from that site (its own WAN is your exit).
+
+- Which devices per site is `mesh.clients` (default `[iphone, macbook]`); `gen-mesh-secrets.py`
+  makes a keypair for each and `render-mesh.py` writes a ready config to
+  `deployments/<site>/clients/<device>.sensitive.conf` (SOPS-encrypted).
+- Import one into the WireGuard app:
+  ```bash
+  sops -d deployments/node_hamburg/clients/iphone.sensitive.conf > /tmp/iphone.conf
+  # macOS: WireGuard app → Import tunnel(s) from file → /tmp/iphone.conf
+  # iPhone: scan a QR, then shred:  qrencode -t ansiutf8 < /tmp/iphone.conf ; shred -u /tmp/iphone.conf
+  ```
+- Connect, then open `ifconfig.me` — it should show **that site's** WAN IP. Each site's ISP
+  router must forward `UDP <wg_client_port>` to the box (alongside the tunnel port).
 
 ## What's in git (and what's never)
 

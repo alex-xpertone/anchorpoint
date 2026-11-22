@@ -14,6 +14,9 @@ title: |md
   id: "{{ n.color | upper }}  (10.0.80.{{ n.index }})"
   local: "local: {{ n.ssid }}\n192.168.{{ n.index * 10 }}.0/24 · {{ n.local_ethers | join('/') }}"
   exits: "exit via {{ n.exits | length }} peer(s)\n{{ n.exits | map(attribute='ether') | join(', ') }} + Wi-Fi"
+{% if n.client_peers %}
+  clients: "test clients: {{ n.client_peers | map(attribute='name') | join(', ') }}\nwg-clients {{ n.client_subnet }} · UDP {{ n.client_port }}"
+{% endif %}
 }
 {% endfor %}
 
@@ -29,4 +32,5 @@ title: |md
 note: |md
   Each edge is a WireGuard tunnel on its own UDP port (both ends forward it).
   Plug into a node's exit port / join its exit SSID to browse from that country.
+  Each site also serves roaming test clients (iPhone + MacBook) on wg-clients.
 | {near: bottom-center}

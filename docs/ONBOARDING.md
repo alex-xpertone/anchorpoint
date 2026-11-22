@@ -108,14 +108,14 @@ For each of the two sites:
    # paste /tmp/hamburg.rsc into the router, then:
    shred -u /tmp/hamburg.rsc
    ```
-3. **Port-forward on this site's ISP router:** forward the WireGuard UDP port (`wg_port`,
-   printed at the bottom of this site's `bootstrap.rsc`) to the router's WAN IP. Both sites
-   forward the same port.
+3. **Port-forward on this site's ISP router:** forward the WireGuard UDP ports (both are
+   printed at the bottom of this site's `bootstrap.rsc`) to the router's WAN IP — the tunnel
+   port (`wg_port`) and the roaming-clients port (`wg_client_port`).
 
 | Site | Forward (UDP) |
 |------|----------------|
-| Hamburg   | `wg_port` (↔ Barcelona) |
-| Barcelona | `wg_port` (↔ Hamburg)   |
+| Hamburg   | `wg_port` (↔ Barcelona) · `wg_client_port` (iPhone/MacBook) |
+| Barcelona | `wg_port` (↔ Hamburg) · `wg_client_port` (iPhone/MacBook) |
 
 ---
 
@@ -127,6 +127,24 @@ For each of the two sites:
 
 ---
 
+## Phase 7 — test clients (iPhone + MacBook)
+Each site serves two roaming WireGuard clients on `wg-clients` (`UDP wg_client_port`) so you
+can test a site from your own devices — full tunnel, so you exit at that site.
+
+1. Make sure the site's ISP router forwards `UDP wg_client_port` (Phase 5).
+2. Decrypt a device config and import it (one per device, per site):
+   ```bash
+   sops -d deployments/node_hamburg/clients/iphone.sensitive.conf > /tmp/iphone.conf
+   # macOS WireGuard app: Import tunnel(s) from file -> /tmp/iphone.conf
+   # iPhone: scan a QR, then shred the file:
+   qrencode -t ansiutf8 < /tmp/iphone.conf   # scan in the WireGuard iOS app
+   shred -u /tmp/iphone.conf
+   ```
+3. Connect the device, open `ifconfig.me` — it must show **that site's** WAN IP. Switch to the
+   other site's config to confirm it exits there instead.
+
+---
+
 ## Day-2 operations
 | Task | How |
 |------|-----|
@@ -134,6 +152,7 @@ For each of the two sites:
 | Rotate a site's key | `gen-mesh-secrets.py --rotate <name>` → re-render → re-flash **both** sites (each holds the other's public key) |
 | Change a DDNS | edit inventory `ddns:` → re-render → re-flash both sites |
 | Edit any secret | `sops secrets/<name>.sops.yaml` |
+| Add / rotate a test device | edit `mesh.clients` (or `--rotate <site>`) → re-render → re-import the new `clients/<device>.sensitive.conf` |
 
 ---
 
@@ -144,4 +163,5 @@ For each of the two sites:
 | Example secrets file (placeholders only) | `secrets/*.sops.yaml.example` | ✅ |
 | PRIVATE keys, admin/wifi passwords (your real values) | `secrets/*.sops.yaml` | ❌ gitignored |
 | Rendered configs (redacted + encrypted) | `deployments/<site>/…` | ❌ gitignored |
+| Per-device client configs (encrypted) | `deployments/<site>/clients/*.sensitive.conf` | ❌ gitignored |
 | age private key | `~/.age/keys.txt` | ❌ never |

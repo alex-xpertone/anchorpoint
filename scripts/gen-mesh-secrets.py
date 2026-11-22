@@ -3,11 +3,12 @@
 AnchorPoint Mesh — secrets generator.
 
 For every node in the inventory, generates (offline, X25519):
-  <name>_wg_private_key   -> encrypted bundle
-  <name>_admin_password   -> encrypted bundle   (random)
-  <name>_wifi_passphrase  -> encrypted bundle   (random)
-and writes the DERIVED public key back into the inventory (wg_public_key,
-non-secret). Plaintext private material never hits disk (sops stdin / `sops set`).
+  <name>_wg_private_key           -> encrypted bundle
+  <name>_admin_password           -> encrypted bundle   (random)
+  <name>_wifi_passphrase          -> encrypted bundle   (random)
+  <name>_<client>_wg_private_key  -> encrypted bundle   (one per roaming client, if mesh.clients set)
+and writes the DERIVED public keys back into the inventory (node wg_public_key and
+node.clients.<client>, non-secret). Plaintext private material never hits disk.
 "<name>" is each node's identifier (its `color` field — a city, a code, anything).
 
 Idempotent: existing bundle keys are detected BY NAME (no decryption) and left
@@ -96,6 +97,7 @@ def main():
     inv = yaml.load(inventory_path.read_text())
     bundle = REPO / inv["mesh"]["secrets_file"]
     colors = [n["color"] for n in inv["nodes"]]
+    client_names = inv["mesh"].get("clients") or []   # roaming test clients per node
     have = existing_keys(bundle)
 
     if args.list:
@@ -103,6 +105,9 @@ def main():
         for c in colors:
             for suf in ("wg_private_key", "admin_password", "wifi_passphrase"):
                 k = f"{c}_{suf}"
+                print(f"  [{'x' if k in have else ' '}] {k}")
+            for cn in client_names:
+                k = f"{c}_{cn}_wg_private_key"
                 print(f"  [{'x' if k in have else ' '}] {k}")
         return
 
@@ -120,6 +125,20 @@ def main():
             k = f"{c}_{suf}"
             if k not in have or args.rotate == c:
                 new[k] = gen_pw(length)
+        # roaming test clients (iphone, macbook, ...) — each gets its own keypair;
+        # private key -> bundle, public key -> inventory (node.clients.<name>).
+        if client_names:
+            nc = node.get("clients")
+            if not isinstance(nc, dict):
+                nc = {}
+                node["clients"] = nc
+            for cn in client_names:
+                ck = f"{c}_{cn}_wg_private_key"
+                if args.rotate == c or ck not in have:
+                    priv, pub = wg_keypair()
+                    new[ck] = priv
+                    nc[cn] = pub
+                    pubs[f"{c}/{cn}"] = pub
 
     if not new:
         print("Nothing to do — all keys present. (--rotate <color> to regenerate.)")

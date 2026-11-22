@@ -14,6 +14,7 @@
 #   ether1 = WAN (uplink)
 #   ether2 = EXIT via HAMBURG Hamburg (192.168.21.0/24, SSID "AnchorPoint-HAM", UDP 51820)
 #   ether3, ether4, ether5 = LOCAL (192.168.20.0/24, SSID "AnchorPoint-BCN")
+#   wg-clients (UDP 51821) = roaming test devices: iphone, macbook (10.0.92.0/24)
 # =============================================================================
 
 #------------------------------------------------------------------------------
@@ -101,6 +102,22 @@
 /interface bridge port add bridge=bridge-hamburg interface=vap-hamburg
 
 #------------------------------------------------------------------------------
+# 5b. ROAMING CLIENTS  (your test devices join wg-clients -> full tunnel, exit HERE)
+#     Reuses THIS node's key; each device dials barcelona.example.net:51821.
+#------------------------------------------------------------------------------
+/interface wireguard add name=wg-clients listen-port=51821 mtu=1420 \
+    private-key="EXAMPLE-PRIVATE-KEY-PLACEHOLDER-NOT-A-REAL-KEY-DO-NOT-USE" comment="roaming test clients"
+/ip address add address=10.0.92.1/24 interface=wg-clients
+/interface list member add interface=wg-clients list=LAN
+/interface wireguard peers add interface=wg-clients public-key="EXAMPLE-PUBKEY-barcelona-iphone-NOT-A-REAL-KEY" \
+    allowed-address=10.0.92.2/32 persistent-keepalive=25s comment="iphone"
+/interface wireguard peers add interface=wg-clients public-key="EXAMPLE-PUBKEY-barcelona-macbook-NOT-A-REAL-KEY" \
+    allowed-address=10.0.92.3/32 persistent-keepalive=25s comment="macbook"
+# accept the clients' WireGuard port on WAN; their traffic egresses via the mesh WAN masquerade (section 7)
+/ip firewall filter add chain=input action=accept protocol=udp dst-port=51821 \
+    in-interface-list=WAN comment="WG roaming clients" place-before=0
+
+#------------------------------------------------------------------------------
 # 6. LEAK-PROOF POLICY ROUTING  (each exit subnet -> its tunnel, NO fallback)
 #    + source-NAT exit traffic to THIS node's overlay IP so the remote exit node
 #      can route replies straight back down the tunnel (10.0.80.x/32 route above).
@@ -136,5 +153,5 @@
 
 # =============================================================================
 # END mesh node barcelona.
-# Forward these UDP ports on this site's ISP router: 51820
+# Forward these UDP ports on this site's ISP router: 51820, 51821 (roaming clients)
 # =============================================================================

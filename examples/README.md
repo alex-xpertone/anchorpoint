@@ -15,7 +15,9 @@ can see exactly what the tool generates before you run it.
   (gitignored — never committed).
 - `render-mesh.py` writes the real per-site config to `deployments/<site>/`: the full
   config as `bootstrap.sensitive.rsc` (**encrypted**), plus a redacted `bootstrap.rsc`
-  with the secrets masked. All of `deployments/` is gitignored.
+  with the secrets masked. It also writes, per site, a WireGuard config for each roaming
+  test device (`clients/<device>.sensitive.conf`, **encrypted**) to import into the
+  iPhone/MacBook app. All of `deployments/` is gitignored.
 
 So your real output is never readable-with-secrets in git — the readable files below exist
 only to illustrate the structure, with the secrets swapped for obvious junk.
@@ -25,6 +27,7 @@ only to illustrate the structure, with the secrets swapped for obvious junk.
 |------|------------|
 | `node_<site>/bootstrap.rsc` | the complete RouterOS config for that site (the real tool writes this to the *encrypted* `bootstrap.sensitive.rsc`; shown here with fake secrets so it's readable) |
 | `node_<site>/cheatsheet.md` | the printable installer card for that site |
+| `node_<site>/clients/<device>.conf` | the per-device WireGuard config (iPhone / MacBook) to import; the real tool also writes an *encrypted* `<device>.sensitive.conf` — shown here with a fake key |
 | `architecture.d2` / `architecture.svg` | the link diagram |
 
 Regenerate these (after editing the template or example) with:
