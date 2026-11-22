@@ -12,13 +12,23 @@
 #
 # Per-site port map (hAP ax2): ether1 = WAN · ether2 = exit via the other site ·
 # ether3/4/5 = local network · Wi-Fi: own SSID = local, other site's SSID = exit.
+# Plus per site: a wg-clients interface (UDP wg_client_port) for your roaming test
+# devices (iPhone + MacBook) — full tunnel, so each device exits at that site.
+#
+# DDNS: each site keeps its public endpoint reachable via DuckDNS — set a
+# `duckdns_subdomain` per node and one `duckdns_token` for the account (below); the
+# router refreshes it every 5 min. The endpoint `ddns` is then derived automatically.
 # =============================================================================
 
 mesh:
   name: anchorpoint
   overlay_subnet: 10.0.80.0/24
   wg_port: 51820                 # the WireGuard UDP port (both ends)
+  wg_client_port: 51821          # UDP port each site serves its roaming test clients on
+  clients: [iphone, macbook]     # per-site roaming devices (each gets its own WireGuard config)
   wifi_ssid_prefix: AnchorPoint  # SSID = AnchorPoint-<ssid_suffix> per site
+  duckdns_token: REPLACE_duckdns_token  # DuckDNS account token (input). gen-mesh-secrets.py
+                                        # encrypts it into the bundle and clears it here.
   timezone: UTC
   secrets_file: secrets/example.sops.yaml   # generated (encrypted); gitignored
 
@@ -28,18 +38,26 @@ nodes:
     index: 1
     location: Hamburg
     country: DE
-    ddns: REPLACE_hamburg_ddns         # this site's public endpoint (DDNS name / public IP)
+    ddns: anchorpoint-hamburg.duckdns.org   # site endpoint (auto = <duckdns_subdomain>.duckdns.org)
+    duckdns_subdomain: anchorpoint-hamburg  # DuckDNS name kept pointed here (token = mesh.duckdns_token)
     ssid_suffix: HAM                   # -> SSID "AnchorPoint-HAM"
     wg_public_key: REPLACE_hamburg_public_key   # filled by gen-mesh-secrets.py
+    clients:                                    # roaming test devices (pubkeys filled by gen)
+      iphone: REPLACE_hamburg_iphone_public_key
+      macbook: REPLACE_hamburg_macbook_public_key
 
   - id: node_barcelona
     color: barcelona
     index: 2
     location: Barcelona
     country: ES
-    ddns: REPLACE_barcelona_ddns
+    ddns: anchorpoint-barcelona.duckdns.org
+    duckdns_subdomain: anchorpoint-barcelona
     ssid_suffix: BCN                   # -> SSID "AnchorPoint-BCN"
     wg_public_key: REPLACE_barcelona_public_key
+    clients:
+      iphone: REPLACE_barcelona_iphone_public_key
+      macbook: REPLACE_barcelona_macbook_public_key
 
 # Both sites must be reachable at their `ddns` endpoint (public IP or DDNS), and each
 # site's ISP router must forward UDP wg_port to it. See docs/ONBOARDING.md.

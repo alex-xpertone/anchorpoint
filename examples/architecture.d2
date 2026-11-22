@@ -10,12 +10,14 @@ hamburg: Hamburg · DE {
   id: "HAMBURG  (10.0.80.1)"
   local: "local: AnchorPoint-HAM\n192.168.10.0/24 · ether3/ether4/ether5"
   exits: "exit via 1 peer(s)\nether2 + Wi-Fi"
+  clients: "test clients: iphone, macbook\nwg-clients 10.0.91.0/24 · UDP 51821"
 }
 barcelona: Barcelona · ES {
   style.fill: "#d6f5d6"
   id: "BARCELONA  (10.0.80.2)"
   local: "local: AnchorPoint-BCN\n192.168.20.0/24 · ether3/ether4/ether5"
   exits: "exit via 1 peer(s)\nether2 + Wi-Fi"
+  clients: "test clients: iphone, macbook\nwg-clients 10.0.92.0/24 · UDP 51821"
 }
 
 # One WireGuard tunnel per unordered pair (dedupe: this.index < remote.index)
@@ -24,4 +26,5 @@ hamburg <-> barcelona: "UDP 51820" {style.stroke-dash: 3}
 note: |md
   Each edge is a WireGuard tunnel on its own UDP port (both ends forward it).
   Plug into a node's exit port / join its exit SSID to browse from that country.
+  Each site also serves roaming test clients (iPhone + MacBook) on wg-clients.
 | {near: bottom-center}

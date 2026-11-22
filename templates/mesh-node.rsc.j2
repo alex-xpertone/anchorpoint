@@ -16,6 +16,9 @@
 #   {{ x.ether }} = EXIT via {{ x.color | upper }} {{ x.location }} ({{ x.subnet }}, SSID "{{ x.ssid }}", UDP {{ x.pair_port }})
 {% endfor %}
 #   {{ node.local_ethers | join(', ') }} = LOCAL ({{ node.local_subnet }}, SSID "{{ node.ssid }}")
+{% if node.client_peers %}
+#   wg-clients (UDP {{ node.client_port }}) = roaming test devices: {{ node.client_peers | map(attribute='name') | join(', ') }} ({{ node.client_subnet }})
+{% endif %}
 # =============================================================================
 
 #------------------------------------------------------------------------------
@@ -47,6 +50,22 @@
 {% for e in node.local_ethers %}
 /interface bridge port remove [find interface={{ e }}]
 {% endfor %}
+{% if node.duckdns_subdomain %}
+
+#------------------------------------------------------------------------------
+# 1b. DYNAMIC DNS (DuckDNS) — keep {{ node.duckdns_subdomain }}.duckdns.org on this WAN IP
+#     A scheduler re-publishes the current public IP every 5 min (and at boot) so
+#     the remote site and your roaming clients can always resolve this endpoint.
+#     check-certificate=no: RouterOS ships no CA bundle by default; the update still
+#     travels over TLS. Import the CA and flip this to =yes for strict validation.
+#------------------------------------------------------------------------------
+/system script add name=duckdns-update dont-require-permissions=yes \
+    comment="DuckDNS: keep {{ node.duckdns_subdomain }}.duckdns.org pointed here" \
+    source="/tool fetch url=\"https://www.duckdns.org/update?domains={{ node.duckdns_subdomain }}&token={{ secrets['duckdns_token'] }}&ip=\" mode=https check-certificate=no keep-result=no"
+/system scheduler add name=duckdns-update interval=5m start-time=startup \
+    on-event="/system script run duckdns-update" comment="DuckDNS refresh (5 min)"
+/system script run duckdns-update
+{% endif %}
 
 #------------------------------------------------------------------------------
 # 2. OVERLAY IDENTITY  (stable 10.0.80.x — tunnel source + watchdog target)
@@ -109,6 +128,24 @@
 {% endfor %}
 
 #------------------------------------------------------------------------------
+# 5b. ROAMING CLIENTS  (your test devices join wg-clients -> full tunnel, exit HERE)
+#     Reuses THIS node's key; each device dials {{ node.ddns }}:{{ node.client_port }}.
+#------------------------------------------------------------------------------
+{% if node.client_peers %}
+/interface wireguard add name=wg-clients listen-port={{ node.client_port }} mtu=1420 \
+    private-key="{{ secrets[node.color ~ '_wg_private_key'] }}" comment="roaming test clients"
+/ip address add address={{ node.client_gw }}/24 interface=wg-clients
+/interface list member add interface=wg-clients list=LAN
+{% for c in node.client_peers %}
+/interface wireguard peers add interface=wg-clients public-key="{{ c.public_key }}" \
+    allowed-address={{ c.address }}/32 persistent-keepalive=25s comment="{{ c.name }}"
+{% endfor %}
+# accept the clients' WireGuard port on WAN; their traffic egresses via the mesh WAN masquerade (section 7)
+/ip firewall filter add chain=input action=accept protocol=udp dst-port={{ node.client_port }} \
+    in-interface-list=WAN comment="WG roaming clients" place-before=0
+{% endif %}
+
+#------------------------------------------------------------------------------
 # 6. LEAK-PROOF POLICY ROUTING  (each exit subnet -> its tunnel, NO fallback)
 #    + source-NAT exit traffic to THIS node's overlay IP so the remote exit node
 #      can route replies straight back down the tunnel (10.0.80.x/32 route above).
@@ -150,5 +187,5 @@
 
 # =============================================================================
 # END mesh node {{ node.color }}.
-# Forward these UDP ports on this site's ISP router: {{ node.exits | map(attribute='pair_port') | join(', ') }}
+# Forward these UDP ports on this site's ISP router: {{ node.exits | map(attribute='pair_port') | join(', ') }}{{ (", " ~ node.client_port ~ " (roaming clients)") if node.client_peers else "" }}
 # =============================================================================

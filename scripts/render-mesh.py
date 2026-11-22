@@ -16,6 +16,7 @@ Derivation (node index i, remotes = the other nodes in index order):
     exit k       = 192.168.<i*10 + k>.0/24  (k=1..)    -> ether<1+k> + remote SSID
     pair port    = wg_port_base + min(i,j)*10 + max(i,j)   (both ends forward it)
     exit iface   = wg-<remote.color>   table = to-<remote.color>
+    client net   = 10.0.<90+i>.0/24    (wg-clients: iphone .2, macbook .3; full tunnel)
 
 Usage:
     scripts/render-mesh.py                      # full (needs sops + the bundle)
@@ -96,9 +97,12 @@ def enrich(mesh: dict, nodes: list[dict]) -> list[dict]:
     base = mesh.get("wg_port_base", 51823)
     prefix = mesh.get("wifi_ssid_prefix")
     explicit_port = mesh.get("wg_port")
+    client_names = mesh.get("clients") or []          # roaming test clients per node (e.g. iphone, macbook)
+    client_port = mesh.get("wg_client_port", 51821)   # UDP port each node serves its clients on
     nodes = sorted(nodes, key=lambda n: n["index"])
     by_index = {n["index"]: n for n in nodes}
-    # resolve each node's SSID: prefix + per-node suffix, else a full `ssid`
+    # resolve each node's SSID: prefix + per-node suffix, else a full `ssid`;
+    # and derive the public endpoint from DuckDNS when a subdomain is given.
     for n in nodes:
         suffix = n.get("ssid_suffix")
         if suffix is not None:
@@ -106,6 +110,13 @@ def enrich(mesh: dict, nodes: list[dict]) -> list[dict]:
         elif "ssid" not in n:
             sys.exit(f"node {n.get('id', n.get('index'))}: give ssid_suffix "
                      f"(with mesh.wifi_ssid_prefix) or a full ssid")
+        # DDNS: the site endpoint IS its DuckDNS name (<subdomain>.duckdns.org).
+        sub = n.get("duckdns_subdomain")
+        if sub:
+            n["ddns"] = f"{sub}.duckdns.org"
+        elif "ddns" not in n:
+            sys.exit(f"node {n.get('id', n.get('index'))}: give duckdns_subdomain "
+                     f"or a static ddns endpoint")
     if explicit_port is not None and len(nodes) != 2:
         sys.exit("mesh.wg_port sets one shared port and is only valid for a 2-node "
                  "link; for >2 nodes drop it and let wg_port_base derive per-pair ports")
@@ -131,6 +142,18 @@ def enrich(mesh: dict, nodes: list[dict]) -> list[dict]:
             })
         # LOCAL network gets the ports after the exits, up to ether5
         n["local_ethers"] = [f"ether{k}" for k in range(2 + len(n["exits"]), 6)]
+        # ROAMING CLIENTS: each node serves its own test devices (e.g. iphone,
+        # macbook) on wg-clients (10.0.<90+i>.0/24, full-tunnel -> they exit HERE).
+        inv_clients = n.get("clients") or {}
+        n["client_port"] = client_port
+        n["client_subnet"] = f"10.0.{90 + i}.0/24"
+        n["client_gw"] = f"10.0.{90 + i}.1"
+        n["client_peers"] = [
+            {"name": cn, "address": f"10.0.{90 + i}.{2 + idx}",
+             "public_key": inv_clients.get(cn),
+             "priv_key_name": f"{n['color']}_{cn}_wg_private_key"}
+            for idx, cn in enumerate(client_names)
+        ]
     return nodes
 
 
@@ -178,6 +201,9 @@ def main():
         ctx = {"mesh": mesh, "node": n, "nodes": nodes, "secrets": red}
         write(out_dir / n["id"] / "bootstrap.rsc", render(env, "mesh-node.rsc.j2", ctx))
         write(out_dir / n["id"] / "cheatsheet.md", render(env, "mesh-cheatsheet.md.j2", ctx))
+        for c in n["client_peers"]:                 # redacted per-device client config (git-safe)
+            write(out_dir / n["id"] / "clients" / f"{c['name']}.conf",
+                  render(env, "wireguard-client.conf.j2", {"mesh": mesh, "node": n, "client": c, "secrets": red}))
 
     # diagram
     write(out_dir / "architecture.d2", render(env, "mesh-diagram.d2.j2", {"mesh": mesh, "nodes": nodes}))
@@ -192,6 +218,9 @@ def main():
             ctx = {"mesh": mesh, "node": n, "nodes": nodes, "secrets": secrets}
             write_encrypted(out_dir / n["id"] / "bootstrap.sensitive.rsc",
                             render(env, "mesh-node.rsc.j2", ctx))
+            for c in n["client_peers"]:             # importable per-device client config (encrypted)
+                write_encrypted(out_dir / n["id"] / "clients" / f"{c['name']}.sensitive.conf",
+                                render(env, "wireguard-client.conf.j2", {"mesh": mesh, "node": n, "client": c, "secrets": secrets}))
     print("Done.")
 
 

@@ -26,11 +26,14 @@ inventory/example.yaml ─►  secrets/<name>.sops.yaml    ─►  deployments/<
         gen-mesh-secrets.py   (writes public keys back)   render-mesh.py
 ```
 
-- **You hand-write** only the small inventory: each site's `id`/name, its public
-  endpoint (`ddns`), a Wi-Fi `ssid_suffix`; and for the link, the `wg_port` and `wifi_ssid_prefix`.
+- **You hand-write** only the small inventory: each site's `id`/name, its DuckDNS name
+  (`duckdns_subdomain`), a Wi-Fi `ssid_suffix`; and for the link, the `wg_port`,
+  `wifi_ssid_prefix` and your DuckDNS account `duckdns_token`.
 - **Generated for you** (never typed, never committed): the two WireGuard keypairs, the
   admin password and the Wi-Fi passphrase — random, stored only in the SOPS-encrypted bundle.
-- Public keys are derived and written back into the inventory (non-secret).
+- Public keys are derived and written back into the inventory (non-secret). Each site's
+  public endpoint (`ddns`) is derived from its `duckdns_subdomain`, and the `duckdns_token`
+  is moved into the encrypted bundle (see [Dynamic DNS](#dynamic-dns-duckdns)).
 
 ## Port map per site (hAP ax2, 5 ports)
 
@@ -51,6 +54,7 @@ So the port you plug into — or the SSID you join — decides which country you
 | Local LAN (SSID `<prefix>-<suffix>`) | `192.168.10.0/24` | `192.168.20.0/24` |
 | Exit subnet (traffic out via the other site) | `192.168.11.0/24` | `192.168.21.0/24` |
 | Tunnel | `UDP <wg_port>` — both ends | ← same |
+| Roaming clients (`wg-clients`, `UDP <wg_client_port>`) | `10.0.91.0/24` (iPhone `.2`, MacBook `.3`) | `10.0.92.0/24` |
 
 **Leak-proof:** the exit subnet is policy-routed into the tunnel with
 `action=lookup-only-in-table` — if the tunnel drops, exit traffic is **dropped, not
@@ -74,7 +78,8 @@ export AGE_RECIPIENT=age1...                     # your PUBLIC key, to encrypt
 ## Quickstart
 
 ```bash
-# 1. Describe your two sites (copy the example; set each site's ddns + ssid_suffix, and wg_port)
+# 1. Describe your two sites (copy the example; set each site's duckdns_subdomain +
+#    ssid_suffix, and the link's wg_port + your duckdns_token). my-link.yaml is gitignored.
 cp inventory/example.yaml inventory/my-link.yaml
 
 # 2. Generate keys + passwords (encrypted bundle; public keys written back)
@@ -92,6 +97,10 @@ Each site gets `deployments/<site>/bootstrap.sensitive.rsc` (encrypted),
 Decrypt a site's config to a scratch file **outside the repo**, paste it into that
 router over a console/WinBox terminal, then shred the scratch file.
 
+Each site also gets `deployments/<site>/clients/<device>.sensitive.conf` — a ready
+WireGuard config per **test device** (iPhone, MacBook) to import on your phone/laptop
+(see [Test clients](#test-clients-iphone--macbook)).
+
 Full runbook — DDNS/CGNAT collection, port-forwarding, flashing, verification,
 day-2 ops — in **[docs/ONBOARDING.md](docs/ONBOARDING.md)**.
 
@@ -100,21 +109,68 @@ day-2 ops — in **[docs/ONBOARDING.md](docs/ONBOARDING.md)**.
 | Field | Where | Meaning |
 |-------|-------|---------|
 | `id`, `color`, `location`, `country` | per site | identity / labels (`color` = the site's short identifier) |
-| `ddns` | per site | the site's public endpoint (DDNS name or public IP) |
+| `duckdns_subdomain` | per site | DuckDNS name for this site; its endpoint `<sub>.duckdns.org` is derived from it |
+| `ddns` | per site | *(optional)* a static endpoint (DDNS name / public IP) — only for a site with **no** `duckdns_subdomain` |
 | `ssid_suffix` | per site | Wi-Fi SSID = `wifi_ssid_prefix` + `-` + suffix |
 | `wifi_ssid_prefix` | link | base SSID name |
 | `wg_port` | link | the WireGuard UDP port (both ends) |
+| `duckdns_token` | link | **(secret)** your DuckDNS account token; `gen-mesh-secrets.py` encrypts it into the bundle and clears it here |
+| `wg_client_port` | link | UDP port each site serves its roaming test clients on (default 51821) |
+| `clients` | link | roaming test devices per site, e.g. `[iphone, macbook]` — each gets its own config |
 
 (A site may instead carry a full `ssid` for back-compat; `ssid_suffix` wins when present.)
 
 > The `mesh:` block and the `mesh-*` script/template names are just the internal
 > tooling names — this builds a **two-site link**.
 
+## Test clients (iPhone + MacBook)
+
+Each site also serves a couple of **roaming WireGuard clients** on a dedicated
+`wg-clients` interface (`UDP <wg_client_port>`), so you can dial into a site from your own
+devices and verify it end-to-end. Each client is **full-tunnel**: once connected you browse
+from that site (its own WAN is your exit).
+
+- Which devices per site is `mesh.clients` (default `[iphone, macbook]`); `gen-mesh-secrets.py`
+  makes a keypair for each and `render-mesh.py` writes a ready config to
+  `deployments/<site>/clients/<device>.sensitive.conf` (SOPS-encrypted).
+- Import one into the WireGuard app:
+  ```bash
+  sops -d deployments/node_hamburg/clients/iphone.sensitive.conf > /tmp/iphone.conf
+  # macOS: WireGuard app → Import tunnel(s) from file → /tmp/iphone.conf
+  # iPhone: scan a QR, then shred:  qrencode -t ansiutf8 < /tmp/iphone.conf ; shred -u /tmp/iphone.conf
+  ```
+- Connect, then open `ifconfig.me` — it should show **that site's** WAN IP. Each site's ISP
+  router must forward `UDP <wg_client_port>` to the box (alongside the tunnel port).
+
+## Dynamic DNS (DuckDNS)
+
+Most home/office WANs have a **changing public IP**, so each site advertises itself with a
+free [DuckDNS](https://www.duckdns.org) name instead of a fixed IP. The other site and your
+roaming clients always dial `anchorpoint-<city>.duckdns.org`; the router keeps that name
+pointed at its current IP.
+
+- **You set** two things in the inventory: a `duckdns_subdomain` **per site** (the name you
+  registered at duckdns.org, without the `.duckdns.org`), and **one** `duckdns_token` for the
+  link (your DuckDNS account token — covers all your subdomains).
+- The token is a **secret**: `gen-mesh-secrets.py` moves it from the inventory into the
+  SOPS-encrypted bundle and blanks it in the inventory, so no plaintext token is ever
+  committed. (To change it later: `sops set secrets/<name>.sops.yaml '["duckdns_token"]' '"<token>"'`.)
+- Each site's endpoint (`ddns`) is **derived** as `<duckdns_subdomain>.duckdns.org` — you
+  don't set it by hand. (A site with a truly static IP can skip DuckDNS and set `ddns` directly.)
+- The generated config installs a `/system script` + `/system scheduler` that re-publishes
+  the current IP **every 5 minutes** (and at boot) — outbound, so **no port-forward** is
+  needed for DuckDNS itself.
+
+> **TLS note:** the update uses `check-certificate=no` because RouterOS ships no CA bundle by
+> default (the request still travels over TLS). To validate strictly, import the DuckDNS CA
+> and flip it to `=yes` in the generated `duckdns-update` script.
+
 ## What's in git (and what's never)
 
 | Kind | In git? |
 |------|---------|
 | Scripts, templates, example inventory, example secrets file | ✅ |
+| Your real inventory `inventory/my-link.yaml` (endpoints, public keys, pre-gen token) | ❌ gitignored |
 | Your real secrets bundle `secrets/*.sops.yaml` | ❌ gitignored |
 | Generated `deployments/` (rendered configs, even encrypted) | ❌ gitignored |
 | age private key `~/.age/keys.txt`, `.venv/` | ❌ gitignored / outside repo |

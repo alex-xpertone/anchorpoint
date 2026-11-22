@@ -1,0 +1,14 @@
+# AnchorPoint test client — {{ client.name }} @ {{ node.location }} ({{ node.color }})
+# Import into the WireGuard app (iOS / macOS): Add Tunnel -> from file/QR.
+# Full tunnel: once connected you browse FROM {{ node.location }} ({{ node.country }}) —
+# the site's own WAN is your internet exit. Use it to test {{ node.location }} end-to-end.
+[Interface]
+PrivateKey = {{ secrets[client.priv_key_name] }}
+Address = {{ client.address }}/32
+DNS = 1.1.1.1
+
+[Peer]
+PublicKey = {{ node.wg_public_key }}
+Endpoint = {{ node.ddns }}:{{ node.client_port }}
+AllowedIPs = 0.0.0.0/0, ::/0
+PersistentKeepalive = 25

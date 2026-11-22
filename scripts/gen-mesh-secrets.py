@@ -3,11 +3,14 @@
 AnchorPoint Mesh — secrets generator.
 
 For every node in the inventory, generates (offline, X25519):
-  <name>_wg_private_key   -> encrypted bundle
-  <name>_admin_password   -> encrypted bundle   (random)
-  <name>_wifi_passphrase  -> encrypted bundle   (random)
-and writes the DERIVED public key back into the inventory (wg_public_key,
-non-secret). Plaintext private material never hits disk (sops stdin / `sops set`).
+  <name>_wg_private_key           -> encrypted bundle
+  <name>_admin_password           -> encrypted bundle   (random)
+  <name>_wifi_passphrase          -> encrypted bundle   (random)
+  <name>_<client>_wg_private_key  -> encrypted bundle   (one per roaming client, if mesh.clients set)
+  duckdns_token                   -> encrypted bundle   (lifted from mesh.duckdns_token, if DuckDNS used)
+and writes the DERIVED public keys back into the inventory (node wg_public_key and
+node.clients.<client>, non-secret). Plaintext private material never hits disk —
+the DuckDNS token is moved into the bundle and blanked in the inventory.
 "<name>" is each node's identifier (its `color` field — a city, a code, anything).
 
 Idempotent: existing bundle keys are detected BY NAME (no decryption) and left
@@ -96,6 +99,7 @@ def main():
     inv = yaml.load(inventory_path.read_text())
     bundle = REPO / inv["mesh"]["secrets_file"]
     colors = [n["color"] for n in inv["nodes"]]
+    client_names = inv["mesh"].get("clients") or []   # roaming test clients per node
     have = existing_keys(bundle)
 
     if args.list:
@@ -104,6 +108,11 @@ def main():
             for suf in ("wg_private_key", "admin_password", "wifi_passphrase"):
                 k = f"{c}_{suf}"
                 print(f"  [{'x' if k in have else ' '}] {k}")
+            for cn in client_names:
+                k = f"{c}_{cn}_wg_private_key"
+                print(f"  [{'x' if k in have else ' '}] {k}")
+        if any(n.get("duckdns_subdomain") for n in inv["nodes"]):
+            print(f"  [{'x' if 'duckdns_token' in have else ' '}] duckdns_token  (DuckDNS, shared)")
         return
 
     new: dict[str, str] = {}
@@ -120,6 +129,34 @@ def main():
             k = f"{c}_{suf}"
             if k not in have or args.rotate == c:
                 new[k] = gen_pw(length)
+        # roaming test clients (iphone, macbook, ...) — each gets its own keypair;
+        # private key -> bundle, public key -> inventory (node.clients.<name>).
+        if client_names:
+            nc = node.get("clients")
+            if not isinstance(nc, dict):
+                nc = {}
+                node["clients"] = nc
+            for cn in client_names:
+                ck = f"{c}_{cn}_wg_private_key"
+                if args.rotate == c or ck not in have:
+                    priv, pub = wg_keypair()
+                    new[ck] = priv
+                    nc[cn] = pub
+                    pubs[f"{c}/{cn}"] = pub
+
+    # DuckDNS token: one shared account secret. Lift it from the inventory into the
+    # encrypted bundle, then blank it in the inventory so no plaintext token lingers.
+    token_lifted = False
+    if any(n.get("duckdns_subdomain") for n in inv["nodes"]) and "duckdns_token" not in have:
+        tok = inv["mesh"].get("duckdns_token")
+        if tok and str(tok) not in ("REPLACE_duckdns_token", "__in_sops_bundle__"):
+            new["duckdns_token"] = str(tok)
+            inv["mesh"]["duckdns_token"] = "__in_sops_bundle__"   # moved to the bundle
+            token_lifted = True
+        else:
+            print("  NOTE: DuckDNS subdomains are set but no token is in the bundle.\n"
+                  "        Put your DuckDNS token in mesh.duckdns_token and re-run, or:\n"
+                  f"        sops set {bundle.name} '[\"duckdns_token\"]' '\"<token>\"'")
 
     if not new:
         print("Nothing to do — all keys present. (--rotate <color> to regenerate.)")
@@ -134,7 +171,7 @@ def main():
         for k, v in new.items():
             sops_set(bundle, k, v)
 
-    if pubs:                                     # persist public keys into inventory
+    if pubs or token_lifted:                      # persist pubkeys + token blanking into inventory
         yaml.dump(inv, inventory_path.open("w"))
 
     print(f"Updated {bundle.name} — set {len(new)} key(s):")
