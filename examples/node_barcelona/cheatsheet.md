@@ -18,13 +18,13 @@
 | **ether2** | `AnchorPoint-HAM` | **Hamburg** — via HAMBURG (tunnel) | `192.168.21.0/24` |
 | **ether3/ether4/ether5** | `AnchorPoint-BCN` | **Barcelona** (local ISP) | `192.168.20.0/24` |
 
-> **Roaming test clients:** iphone + macbook connect over WireGuard to this site (`wg-clients` · UDP 51821 · `10.0.92.0/24`) — full tunnel, so they exit in **Barcelona**.
+> **Roaming test clients:** iphone + macbook connect over WireGuard to this site (`wg-clients` · UDP 51823 · `10.0.92.0/24`) — full tunnel, so they exit in **Barcelona**.
 
 ---
 
 ### 📡 Port-forward on THIS site's ISP router → the router's WAN IP
 - **UDP 51820** — WireGuard tunnel barcelona ↔ hamburg (Hamburg)
-- **UDP 51821** — roaming test clients (iphone, macbook)
+- **UDP 51823** — roaming test clients (iphone, macbook)
 > All ports are UDP. Tunnel ports are forwarded on **both** ends of each tunnel.
 > **DDNS:** `anchorpoint-barcelona.duckdns.org` is kept current by DuckDNS (a scheduler on the router updates it every 5 min, outbound) — **no port-forward** needed for it.
 

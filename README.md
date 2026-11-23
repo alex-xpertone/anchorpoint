@@ -115,7 +115,7 @@ day-2 ops — in **[docs/ONBOARDING.md](docs/ONBOARDING.md)**.
 | `wifi_ssid_prefix` | link | base SSID name |
 | `wg_port` | link | the WireGuard UDP port (both ends) |
 | `duckdns_token` | link | **(secret)** your DuckDNS account token; `gen-mesh-secrets.py` encrypts it into the bundle and clears it here |
-| `wg_client_port` | link | UDP port each site serves its roaming test clients on (default 51821) |
+| `wg_client_port` | link | UDP port each site serves its roaming test clients on (default 51823) |
 | `clients` | link | roaming test devices per site, e.g. `[iphone, macbook]` — each gets its own config |
 
 (A site may instead carry a full `ssid` for back-compat; `ssid_suffix` wins when present.)
