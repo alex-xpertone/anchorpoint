@@ -12,13 +12,14 @@ gateway and an internet exit for the other. Examples use **Hamburg** and **Barce
 
 ## 0. One-time operator setup
 ```bash
-brew install sops age d2
-python3 -m venv .venv && . .venv/bin/activate
-pip install jinja2 pyyaml cryptography ruamel.yaml
-age-keygen -o ~/.age/keys.txt                     # if you don't have one; prints "Public key: age1..."
-export SOPS_AGE_KEY_FILE=$HOME/.age/keys.txt      # your age PRIVATE key (decrypt / render)
-export AGE_RECIPIENT=age1...                       # your age PUBLIC key   (encrypt)
+brew install sops age d2          # the CLIs (Homebrew; can't be scripted away)
+source scripts/env.sh             # venv + Python deps + age key + env vars (idempotent)
 ```
+`scripts/env.sh` is **sourced, not run**: it builds the venv + installs deps on first use,
+generates your age key at `~/.age/keys.txt` if missing, activates the venv, and exports
+`SOPS_AGE_KEY_FILE` + `AGE_RECIPIENT`. Re-source it in each new shell (the one-time work
+runs once). Keep `~/.age/keys.txt` safe and backed up — it's the only key that decrypts
+your secrets.
 
 ---
 

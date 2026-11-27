@@ -65,15 +65,16 @@ leaked** to the local ISP. FastTrack is disabled (it bypasses policy routing + M
 ## Prerequisites
 
 ```bash
-brew install sops age d2                 # macOS (or your package manager)
-python3 -m venv .venv && . .venv/bin/activate
-pip install jinja2 pyyaml cryptography ruamel.yaml
-
-# One age keypair per operator. Keep the PRIVATE key safe and OUT of the repo.
-age-keygen -o ~/.age/keys.txt            # prints "Public key: age1..."
-export SOPS_AGE_KEY_FILE=$HOME/.age/keys.txt    # to decrypt / render
-export AGE_RECIPIENT=age1...                     # your PUBLIC key, to encrypt
+brew install sops age d2                 # the CLIs (macOS; or your package manager)
+source scripts/env.sh                    # venv + deps + age key + env vars (idempotent)
 ```
+
+**`scripts/env.sh` is sourced, not run.** On first use it creates the Python venv and
+installs the deps (`jinja2 pyyaml cryptography ruamel.yaml`), generates your age keypair
+at `~/.age/keys.txt` if you don't have one, then activates the venv and exports
+`SOPS_AGE_KEY_FILE` + `AGE_RECIPIENT`. Source it again in each new shell — it only does
+the one-time work once. (Works in zsh and bash. Back up `~/.age/keys.txt` — it's the only
+thing that can decrypt your secrets.)
 
 ## Quickstart
 
