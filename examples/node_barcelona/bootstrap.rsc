@@ -11,7 +11,8 @@
 #       both ways (this node exiting via a remote, AND being an exit for remotes)
 # -----------------------------------------------------------------------------
 # Port map for this node:
-#   ether1 = WAN (uplink)
+#   ether1 = WAN (uplink, primary)
+#   wifi2 (2.4 GHz) = WAN backup — Wi-Fi station to "HomeWiFi-BCN" (failover)
 #   ether2 = EXIT via HAMBURG Hamburg (192.168.21.0/24, SSID "AnchorPoint-HAM", UDP 51820)
 #   ether3, ether4, ether5 = LOCAL (192.168.20.0/24, SSID "AnchorPoint-BCN")
 #   wg-clients (UDP 51823) = roaming test devices: iphone, macbook (10.0.92.0/24)
@@ -37,7 +38,7 @@
 /interface list add name=WAN comment="mesh"
 /interface list add name=LAN comment="mesh"
 /interface list member add interface=ether1 list=WAN
-/ip dhcp-client add interface=ether1 disabled=no use-peer-dns=no comment="WAN uplink"
+/ip dhcp-client add interface=ether1 disabled=no use-peer-dns=no add-default-route=yes default-route-distance=1 comment="WAN uplink (primary)"
 
 # Detach ether2..ether5 from the default bridge so each role gets its own network.
 /interface bridge port remove [find interface=ether2]
@@ -58,6 +59,23 @@
 /system scheduler add name=duckdns-update interval=5m start-time=startup \
     on-event="/system script run duckdns-update" comment="DuckDNS refresh (5 min)"
 /system script run duckdns-update
+
+#------------------------------------------------------------------------------
+# 1c. WAN FAILOVER — Wi-Fi uplink backup on wifi2 (2.4 GHz on hAP ax2)
+#     Primary WAN is the ether1 cable (default route distance 1). This joins your
+#     local router's Wi-Fi "HomeWiFi-BCN" as a station and adds a
+#     backup default route (distance 2): if the ether1 link drops, traffic — the
+#     site-to-site tunnel included — fails over to Wi-Fi and back automatically.
+#     The AnchorPoint SSIDs stay on wifi1 (5 GHz), a separate radio, so clients
+#     are unaffected. ⚠ Validate the station syntax on your build (CHR has no radios).
+#------------------------------------------------------------------------------
+/interface wifi set wifi2 configuration.mode=station \
+    configuration.ssid="HomeWiFi-BCN" \
+    security.authentication-types=wpa2-psk,wpa3-psk \
+    security.passphrase="EXAMPLE-WIFI-UPLINK-PASSWORD-NOT-REAL" disabled=no
+/interface list member add interface=wifi2 list=WAN
+/ip dhcp-client add interface=wifi2 disabled=no use-peer-dns=no \
+    add-default-route=yes default-route-distance=2 comment="WAN uplink (Wi-Fi backup)"
 
 #------------------------------------------------------------------------------
 # 2. OVERLAY IDENTITY  (stable 10.0.80.x — tunnel source + watchdog target)

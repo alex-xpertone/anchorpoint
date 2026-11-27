@@ -8,6 +8,7 @@
 | **Overlay IP** | `10.0.80.1` |
 | **This site's DDNS** | `anchorpoint-hamburg.duckdns.org` |
 | **Admin / Wi-Fi password** | in the SOPS bundle (`hamburg_admin_password`, `hamburg_wifi_passphrase`) |
+| **WAN backup** | Wi-Fi station on `wifi2` (2.4 GHz) → `HomeWiFi-HAM` — auto-failover if the ether1 cable drops |
 
 ---
 

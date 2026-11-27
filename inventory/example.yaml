@@ -18,6 +18,11 @@
 # DDNS: each site keeps its public endpoint reachable via DuckDNS — set a
 # `duckdns_subdomain` per node and one `duckdns_token` for the account (below); the
 # router refreshes it every 5 min. The endpoint `ddns` is then derived automatically.
+#
+# WAN failover (optional): give a node a `wan_wifi_backup` (your local router's Wi-Fi)
+# and if the ether1 cable drops, the site fails over to that Wi-Fi uplink (2.4 GHz /
+# wifi2) and back — the AnchorPoint SSIDs stay on 5 GHz (wifi1). Remove the block for
+# wired-only. (Radio names are hAP ax2; ax3 swaps them — see mesh.wifi_*_iface.)
 # =============================================================================
 
 mesh:
@@ -27,6 +32,9 @@ mesh:
   wg_client_port: 51823          # UDP port each site serves its roaming test clients on
   clients: [iphone, macbook]     # per-site roaming devices (each gets its own WireGuard config)
   wifi_ssid_prefix: AnchorPoint  # SSID = AnchorPoint-<ssid_suffix> per site
+  wifi_ap_iface: wifi1           # radio for the AnchorPoint SSIDs — 5 GHz on hAP ax2
+  wifi_wan_iface: wifi2          # radio for the Wi-Fi WAN backup   — 2.4 GHz on hAP ax2
+                                 # (ax3 swaps these; verify with /interface wifi print)
   duckdns_token: REPLACE_duckdns_token  # DuckDNS account token (input). gen-mesh-secrets.py
                                         # encrypts it into the bundle and clears it here.
   timezone: UTC
@@ -45,6 +53,9 @@ nodes:
     clients:                                    # roaming test devices (pubkeys filled by gen)
       iphone: REPLACE_hamburg_iphone_public_key
       macbook: REPLACE_hamburg_macbook_public_key
+    wan_wifi_backup:                            # optional WAN failover — your local router's Wi-Fi
+      ssid: HomeWiFi-HAM                        # the 2.4 GHz SSID to join as a backup uplink
+      password: REPLACE_hamburg_wan_wifi_password   # its Wi-Fi password; gen encrypts it into the bundle
 
   - id: node_barcelona
     color: barcelona
@@ -58,6 +69,9 @@ nodes:
     clients:
       iphone: REPLACE_barcelona_iphone_public_key
       macbook: REPLACE_barcelona_macbook_public_key
+    wan_wifi_backup:
+      ssid: HomeWiFi-BCN
+      password: REPLACE_barcelona_wan_wifi_password
 
 # Both sites must be reachable at their `ddns` endpoint (public IP or DDNS), and each
 # site's ISP router must forward UDP wg_port to it. See docs/ONBOARDING.md.

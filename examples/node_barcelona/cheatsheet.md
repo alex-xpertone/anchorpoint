@@ -8,6 +8,7 @@
 | **Overlay IP** | `10.0.80.2` |
 | **This site's DDNS** | `anchorpoint-barcelona.duckdns.org` |
 | **Admin / Wi-Fi password** | in the SOPS bundle (`barcelona_admin_password`, `barcelona_wifi_passphrase`) |
+| **WAN backup** | Wi-Fi station on `wifi2` (2.4 GHz) → `HomeWiFi-BCN` — auto-failover if the ether1 cable drops |
 
 ---
 

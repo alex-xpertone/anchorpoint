@@ -39,10 +39,10 @@ inventory/example.yaml ─►  secrets/<name>.sops.yaml    ─►  deployments/<
 
 | Port | Role |
 |------|------|
-| `ether1` | WAN / uplink (your local ISP) |
+| `ether1` | WAN / uplink (your local ISP) — optional [Wi-Fi backup](#wi-fi-wan-failover-optional) on `wifi2` |
 | `ether2` | **Exit** via the other site |
 | `ether3` / `ether4` / `ether5` | **Local** network (normal local internet) |
-| Wi-Fi | own SSID = local · the other site's SSID = exit via that site |
+| Wi-Fi | `wifi1` (5 GHz): own SSID = local · the other site's SSID = exit via that site |
 
 So the port you plug into — or the SSID you join — decides which country you browse from.
 
@@ -113,7 +113,9 @@ day-2 ops — in **[docs/ONBOARDING.md](docs/ONBOARDING.md)**.
 | `duckdns_subdomain` | per site | DuckDNS name for this site; its endpoint `<sub>.duckdns.org` is derived from it |
 | `ddns` | per site | *(optional)* a static endpoint (DDNS name / public IP) — only for a site with **no** `duckdns_subdomain` |
 | `ssid_suffix` | per site | Wi-Fi SSID = `wifi_ssid_prefix` + `-` + suffix |
+| `wan_wifi_backup` | per site | *(optional)* `{ssid, password}` of your local router's Wi-Fi → a **WAN failover** uplink (see below). `password` is **(secret)** — `gen` encrypts it into the bundle |
 | `wifi_ssid_prefix` | link | base SSID name |
+| `wifi_ap_iface` / `wifi_wan_iface` | link | radios for the AnchorPoint SSIDs / the Wi-Fi WAN backup (default `wifi1`=5 GHz, `wifi2`=2.4 GHz on hAP ax2; **swap on ax3**) |
 | `wg_port` | link | the WireGuard UDP port (both ends) |
 | `duckdns_token` | link | **(secret)** your DuckDNS account token; `gen-mesh-secrets.py` encrypts it into the bundle and clears it here |
 | `wg_client_port` | link | UDP port each site serves its roaming test clients on (default 51823) |
@@ -165,6 +167,34 @@ pointed at its current IP.
 > **TLS note:** the update uses `check-certificate=no` because RouterOS ships no CA bundle by
 > default (the request still travels over TLS). To validate strictly, import the DuckDNS CA
 > and flip it to `=yes` in the generated `duckdns-update` script.
+
+## Wi-Fi WAN failover (optional)
+
+Each site's internet uplink is the **wired `ether1`** (to your ISP box). You can add a
+**Wi-Fi backup uplink** so a site stays online — and the site-to-site tunnel stays up — if
+that cable/port fails:
+
+```yaml
+    wan_wifi_backup:           # per node
+      ssid: MyHomeRouter       # your local router's Wi-Fi (join it as a station)
+      password: <its Wi-Fi password>   # secret -> gen encrypts it into the bundle
+```
+
+- The hAP ax2 has **two radios**: the AnchorPoint SSIDs stay on **`wifi1` (5 GHz)**; the backup
+  joins your router on **`wifi2` (2.4 GHz)** in station mode. Separate radios, so your local/exit
+  Wi-Fi and the roaming clients are unaffected. (On an **ax3** the radios are swapped — set
+  `wifi_ap_iface`/`wifi_wan_iface`; verify with `/interface wifi print`.)
+- **Failover** is by default-route distance: `ether1` = 1 (primary), Wi-Fi = 2 (backup). If the
+  `ether1` link drops, traffic moves to Wi-Fi and back automatically. The WireGuard tunnel roams
+  to the new path and DuckDNS re-publishes the IP within 5 min.
+- **No port-forward** for the backup — it's an outbound station + DHCP client. Best paired with a
+  backup that reaches the **same upstream router** as the cable (seamless, same public IP).
+- The upstream Wi-Fi password is **(secret)** — `gen-mesh-secrets.py` lifts it from the inventory
+  into the encrypted bundle and blanks it, exactly like the DuckDNS token. Omit the whole
+  `wan_wifi_backup` block for a wired-only site.
+
+> ⚠ The Wi-Fi **station** syntax (like all the Wi-Fi config) needs validating on your RouterOS
+> build — CHR has no radios, so it can't be tested there.
 
 ## What's in git (and what's never)
 
