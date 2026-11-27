@@ -14,7 +14,7 @@
 #   ether1 = WAN (uplink)
 #   ether2 = EXIT via BARCELONA Barcelona (192.168.11.0/24, SSID "AnchorPoint-BCN", UDP 51820)
 #   ether3, ether4, ether5 = LOCAL (192.168.10.0/24, SSID "AnchorPoint-HAM")
-#   wg-clients (UDP 51821) = roaming test devices: iphone, macbook (10.0.91.0/24)
+#   wg-clients (UDP 51823) = roaming test devices: iphone, macbook (10.0.91.0/24)
 # =============================================================================
 
 #------------------------------------------------------------------------------
@@ -117,9 +117,9 @@
 
 #------------------------------------------------------------------------------
 # 5b. ROAMING CLIENTS  (your test devices join wg-clients -> full tunnel, exit HERE)
-#     Reuses THIS node's key; each device dials anchorpoint-hamburg.duckdns.org:51821.
+#     Reuses THIS node's key; each device dials anchorpoint-hamburg.duckdns.org:51823.
 #------------------------------------------------------------------------------
-/interface wireguard add name=wg-clients listen-port=51821 mtu=1420 \
+/interface wireguard add name=wg-clients listen-port=51823 mtu=1420 \
     private-key="EXAMPLE-PRIVATE-KEY-PLACEHOLDER-NOT-A-REAL-KEY-DO-NOT-USE" comment="roaming test clients"
 /ip address add address=10.0.91.1/24 interface=wg-clients
 /interface list member add interface=wg-clients list=LAN
@@ -128,7 +128,7 @@
 /interface wireguard peers add interface=wg-clients public-key="EXAMPLE-PUBKEY-hamburg-macbook-NOT-A-REAL-KEY" \
     allowed-address=10.0.91.3/32 persistent-keepalive=25s comment="macbook"
 # accept the clients' WireGuard port on WAN; their traffic egresses via the mesh WAN masquerade (section 7)
-/ip firewall filter add chain=input action=accept protocol=udp dst-port=51821 \
+/ip firewall filter add chain=input action=accept protocol=udp dst-port=51823 \
     in-interface-list=WAN comment="WG roaming clients" place-before=0
 
 #------------------------------------------------------------------------------
@@ -167,5 +167,5 @@
 
 # =============================================================================
 # END mesh node hamburg.
-# Forward these UDP ports on this site's ISP router: 51820, 51821 (roaming clients)
+# Forward these UDP ports on this site's ISP router: 51820, 51823 (roaming clients)
 # =============================================================================

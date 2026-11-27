@@ -24,7 +24,7 @@ mesh:
   name: anchorpoint
   overlay_subnet: 10.0.80.0/24
   wg_port: 51820                 # the WireGuard UDP port (both ends)
-  wg_client_port: 51821          # UDP port each site serves its roaming test clients on
+  wg_client_port: 51823          # UDP port each site serves its roaming test clients on
   clients: [iphone, macbook]     # per-site roaming devices (each gets its own WireGuard config)
   wifi_ssid_prefix: AnchorPoint  # SSID = AnchorPoint-<ssid_suffix> per site
   duckdns_token: REPLACE_duckdns_token  # DuckDNS account token (input). gen-mesh-secrets.py

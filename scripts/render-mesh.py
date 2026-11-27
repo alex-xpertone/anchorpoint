@@ -98,7 +98,7 @@ def enrich(mesh: dict, nodes: list[dict]) -> list[dict]:
     prefix = mesh.get("wifi_ssid_prefix")
     explicit_port = mesh.get("wg_port")
     client_names = mesh.get("clients") or []          # roaming test clients per node (e.g. iphone, macbook)
-    client_port = mesh.get("wg_client_port", 51821)   # UDP port each node serves its clients on
+    client_port = mesh.get("wg_client_port", 51823)   # UDP port each node serves its clients on
     nodes = sorted(nodes, key=lambda n: n["index"])
     by_index = {n["index"]: n for n in nodes}
     # resolve each node's SSID: prefix + per-node suffix, else a full `ssid`;
