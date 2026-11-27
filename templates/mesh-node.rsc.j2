@@ -1,3 +1,5 @@
+{% set ap_wifi = mesh.wifi_ap_iface | default('wifi1') %}
+{% set wan_wifi = mesh.wifi_wan_iface | default('wifi2') %}
 # =============================================================================
 # AnchorPoint Mesh — NODE CONFIG  {{ node.color | upper }} / {{ node.location }}
 # Device: MikroTik hAP ax2 (5-port) · RouterOS v7 · full-mesh WireGuard
@@ -11,7 +13,10 @@
 #       both ways (this node exiting via a remote, AND being an exit for remotes)
 # -----------------------------------------------------------------------------
 # Port map for this node:
-#   ether1 = WAN (uplink)
+#   ether1 = WAN (uplink, primary)
+{% if node.wan_wifi_backup %}
+#   {{ wan_wifi }} (2.4 GHz) = WAN backup — Wi-Fi station to "{{ node.wan_wifi_backup.ssid }}" (failover)
+{% endif %}
 {% for x in node.exits %}
 #   {{ x.ether }} = EXIT via {{ x.color | upper }} {{ x.location }} ({{ x.subnet }}, SSID "{{ x.ssid }}", UDP {{ x.pair_port }})
 {% endfor %}
@@ -41,7 +46,7 @@
 /interface list add name=WAN comment="mesh"
 /interface list add name=LAN comment="mesh"
 /interface list member add interface=ether1 list=WAN
-/ip dhcp-client add interface=ether1 disabled=no use-peer-dns=no comment="WAN uplink"
+/ip dhcp-client add interface=ether1 disabled=no use-peer-dns=no add-default-route=yes default-route-distance=1 comment="WAN uplink (primary)"
 
 # Detach ether2..ether5 from the default bridge so each role gets its own network.
 {% for x in node.exits %}
@@ -65,6 +70,25 @@
 /system scheduler add name=duckdns-update interval=5m start-time=startup \
     on-event="/system script run duckdns-update" comment="DuckDNS refresh (5 min)"
 /system script run duckdns-update
+{% endif %}
+{% if node.wan_wifi_backup %}
+
+#------------------------------------------------------------------------------
+# 1c. WAN FAILOVER — Wi-Fi uplink backup on {{ wan_wifi }} (2.4 GHz on hAP ax2)
+#     Primary WAN is the ether1 cable (default route distance 1). This joins your
+#     local router's Wi-Fi "{{ node.wan_wifi_backup.ssid }}" as a station and adds a
+#     backup default route (distance 2): if the ether1 link drops, traffic — the
+#     site-to-site tunnel included — fails over to Wi-Fi and back automatically.
+#     The AnchorPoint SSIDs stay on {{ ap_wifi }} (5 GHz), a separate radio, so clients
+#     are unaffected. ⚠ Validate the station syntax on your build (CHR has no radios).
+#------------------------------------------------------------------------------
+/interface wifi set {{ wan_wifi }} configuration.mode=station \
+    configuration.ssid="{{ node.wan_wifi_backup.ssid }}" \
+    security.authentication-types=wpa2-psk,wpa3-psk \
+    security.passphrase="{{ secrets[node.color ~ '_wan_wifi_password'] }}" disabled=no
+/interface list member add interface={{ wan_wifi }} list=WAN
+/ip dhcp-client add interface={{ wan_wifi }} disabled=no use-peer-dns=no \
+    add-default-route=yes default-route-distance=2 comment="WAN uplink (Wi-Fi backup)"
 {% endif %}
 
 #------------------------------------------------------------------------------
@@ -105,9 +129,9 @@
 /ip pool add name=pool-local ranges={{ node.local_gw[:-1] }}10-{{ node.local_gw[:-1] }}254
 /ip dhcp-server add name=dhcp-local interface=bridge-local address-pool=pool-local disabled=no
 /ip dhcp-server network add address={{ node.local_subnet }} gateway={{ node.local_gw }} dns-server={{ node.local_gw }}
-/interface wifi set wifi1 configuration.mode=ap configuration.ssid="{{ node.ssid }}" \
+/interface wifi set {{ ap_wifi }} configuration.mode=ap configuration.ssid="{{ node.ssid }}" \
     security.authentication-types=wpa2-psk,wpa3-psk security.passphrase="{{ secrets[node.color ~ '_wifi_passphrase'] }}" disabled=no
-/interface bridge port add bridge=bridge-local interface=wifi1
+/interface bridge port add bridge=bridge-local interface={{ ap_wifi }}
 
 #------------------------------------------------------------------------------
 # 5. EXIT NETWORKS  (one per remote: wired port + matching Wi-Fi VAP)
@@ -121,7 +145,7 @@
 /ip pool add name=pool-{{ x.color }} ranges={{ x.gw[:-1] }}10-{{ x.gw[:-1] }}254
 /ip dhcp-server add name=dhcp-{{ x.color }} interface={{ x.bridge }} address-pool=pool-{{ x.color }} disabled=no
 /ip dhcp-server network add address={{ x.subnet }} gateway={{ x.gw }} dns-server={{ x.gw }}
-/interface wifi add name={{ x.vap }} master-interface=wifi1 configuration.mode=ap \
+/interface wifi add name={{ x.vap }} master-interface={{ ap_wifi }} configuration.mode=ap \
     configuration.ssid="{{ x.ssid }}" security.authentication-types=wpa2-psk,wpa3-psk \
     security.passphrase="{{ secrets[node.color ~ '_wifi_passphrase'] }}" disabled=no
 /interface bridge port add bridge={{ x.bridge }} interface={{ x.vap }}

@@ -59,6 +59,10 @@ Edit the two node blocks:
 - Set each `duckdns_subdomain:` (from Phase 0) and `ssid_suffix:` (its Wi-Fi name =
   `wifi_ssid_prefix`-`suffix`). The endpoint `ddns:` is **derived** from the subdomain — leave it.
 - Set `wg_port:` (the UDP port both ends use) and `duckdns_token:` (your DuckDNS account token).
+- *(optional)* **WAN failover:** set each node's `wan_wifi_backup:` to your local router's Wi-Fi
+  (`ssid` + `password`) so the site fails over from the `ether1` cable to a 2.4 GHz Wi-Fi uplink
+  (`wifi2`) and back. The password is lifted into the bundle like the token. Remove the block for
+  wired-only. See [Wi-Fi WAN failover](../README.md#wi-fi-wan-failover-optional).
 - Leave `wg_public_key:` and the `clients:` keys as `REPLACE_...` — the generator fills them.
 
 Everything else (subnets, port layout, routes) is **derived** — don't hand-edit.
@@ -75,9 +79,10 @@ scripts/gen-mesh-secrets.py --inventory inventory/my-link.yaml --list    # inspe
 ```
 Generates each site's keypair (offline X25519), writes **private** keys +
 admin/wifi passwords into `secrets/<name>.sops.yaml` (SOPS-encrypted, gitignored) and
-the **public** keys into the inventory. It also **moves your `duckdns_token`** from the
-inventory into the encrypted bundle and blanks it in the inventory (no plaintext token is
-left behind). Re-runs never overwrite; `--rotate <name>` regenerates one site.
+the **public** keys into the inventory. It also **moves your `duckdns_token` and any
+`wan_wifi_backup` password** from the inventory into the encrypted bundle and blanks them
+there (no plaintext secret is left behind). Re-runs never overwrite; `--rotate <name>`
+regenerates one site.
 
 ---
 
@@ -176,7 +181,7 @@ can test a site from your own devices — full tunnel, so you exit at that site.
 | Example inventory (placeholders) | `inventory/example.yaml` | ✅ plaintext |
 | Your real inventory: subdomains, SSIDs, PUBLIC keys, subnets (+ token until Phase 2) | `inventory/my-link.yaml` | ❌ gitignored |
 | Example secrets file (placeholders only) | `secrets/*.sops.yaml.example` | ✅ |
-| PRIVATE keys, admin/wifi passwords, **DuckDNS token** (your real values) | `secrets/*.sops.yaml` | ❌ gitignored |
+| PRIVATE keys, admin/wifi passwords, **DuckDNS token**, **Wi-Fi backup password** (real values) | `secrets/*.sops.yaml` | ❌ gitignored |
 | Rendered configs (redacted + encrypted) | `deployments/<site>/…` | ❌ gitignored |
 | Per-device client configs (encrypted) | `deployments/<site>/clients/*.sensitive.conf` | ❌ gitignored |
 | age private key | `~/.age/keys.txt` | ❌ never |

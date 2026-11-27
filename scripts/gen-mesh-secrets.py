@@ -8,6 +8,7 @@ For every node in the inventory, generates (offline, X25519):
   <name>_wifi_passphrase          -> encrypted bundle   (random)
   <name>_<client>_wg_private_key  -> encrypted bundle   (one per roaming client, if mesh.clients set)
   duckdns_token                   -> encrypted bundle   (lifted from mesh.duckdns_token, if DuckDNS used)
+  <name>_wan_wifi_password        -> encrypted bundle   (lifted from node.wan_wifi_backup, if Wi-Fi backup set)
 and writes the DERIVED public keys back into the inventory (node wg_public_key and
 node.clients.<client>, non-secret). Plaintext private material never hits disk —
 the DuckDNS token is moved into the bundle and blanked in the inventory.
@@ -113,10 +114,15 @@ def main():
                 print(f"  [{'x' if k in have else ' '}] {k}")
         if any(n.get("duckdns_subdomain") for n in inv["nodes"]):
             print(f"  [{'x' if 'duckdns_token' in have else ' '}] duckdns_token  (DuckDNS, shared)")
+        for n in inv["nodes"]:
+            if isinstance(n.get("wan_wifi_backup"), dict):
+                k = f"{n['color']}_wan_wifi_password"
+                print(f"  [{'x' if k in have else ' '}] {k}  (Wi-Fi WAN backup)")
         return
 
     new: dict[str, str] = {}
     pubs: dict[str, str] = {}
+    wan_lifted = False
     for node in inv["nodes"]:
         c = node["color"]
         pk = f"{c}_wg_private_key"
@@ -143,6 +149,18 @@ def main():
                     new[ck] = priv
                     nc[cn] = pub
                     pubs[f"{c}/{cn}"] = pub
+        # WAN Wi-Fi backup password (user-provided): lift into the bundle, blank it here.
+        wb = node.get("wan_wifi_backup")
+        if isinstance(wb, dict):
+            wk = f"{c}_wan_wifi_password"
+            pw = wb.get("password")
+            if wk not in have and pw and not str(pw).startswith("REPLACE_") and str(pw) != "__in_sops_bundle__":
+                new[wk] = str(pw)
+                wb["password"] = "__in_sops_bundle__"     # moved to the bundle
+                wan_lifted = True
+            elif wk not in have and str(pw).startswith("REPLACE_"):
+                print(f"  NOTE: {c}: set wan_wifi_backup.password (your local Wi-Fi password) and re-run,\n"
+                      f"        or remove the wan_wifi_backup block for wired-only.")
 
     # DuckDNS token: one shared account secret. Lift it from the inventory into the
     # encrypted bundle, then blank it in the inventory so no plaintext token lingers.
@@ -171,7 +189,7 @@ def main():
         for k, v in new.items():
             sops_set(bundle, k, v)
 
-    if pubs or token_lifted:                      # persist pubkeys + token blanking into inventory
+    if pubs or token_lifted or wan_lifted:        # persist pubkeys + token/password blanking into inventory
         yaml.dump(inv, inventory_path.open("w"))
 
     print(f"Updated {bundle.name} — set {len(new)} key(s):")

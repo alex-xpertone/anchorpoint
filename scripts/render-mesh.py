@@ -123,6 +123,7 @@ def enrich(mesh: dict, nodes: list[dict]) -> list[dict]:
     for n in nodes:
         i = n["index"]
         n["wg_ip"] = f"10.0.80.{i}"
+        n["wan_wifi_backup"] = n.get("wan_wifi_backup")   # optional Wi-Fi WAN failover (ssid + lifted password)
         n["local_subnet"] = f"192.168.{i*10}.0/24"
         n["local_gw"] = f"192.168.{i*10}.1"
         n["exits"] = []

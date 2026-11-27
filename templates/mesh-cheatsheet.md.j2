@@ -8,6 +8,9 @@
 | **Overlay IP** | `{{ node.wg_ip }}` |
 | **This site's DDNS** | `{{ node.ddns }}` |
 | **Admin / Wi-Fi password** | in the SOPS bundle (`{{ node.color }}_admin_password`, `{{ node.color }}_wifi_passphrase`) |
+{% if node.wan_wifi_backup %}
+| **WAN backup** | Wi-Fi station on `{{ mesh.wifi_wan_iface | default('wifi2') }}` (2.4 GHz) → `{{ node.wan_wifi_backup.ssid }}` — auto-failover if the ether1 cable drops |
+{% endif %}
 
 ---
 
