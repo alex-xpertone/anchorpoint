@@ -110,13 +110,15 @@ def enrich(mesh: dict, nodes: list[dict]) -> list[dict]:
         elif "ssid" not in n:
             sys.exit(f"node {n.get('id', n.get('index'))}: give ssid_suffix "
                      f"(with mesh.wifi_ssid_prefix) or a full ssid")
-        # DDNS: the site endpoint IS its DuckDNS name (<subdomain>.duckdns.org).
+        # DDNS: either (A) DuckDNS — derive the endpoint from duckdns_subdomain and render
+        # the on-router updater; or (B) a static/own ddns — use it as-is, no updater.
         sub = n.get("duckdns_subdomain")
+        n["duckdns_subdomain"] = sub           # normalize (None when absent) for template guards
         if sub:
             n["ddns"] = f"{sub}.duckdns.org"
         elif "ddns" not in n:
-            sys.exit(f"node {n.get('id', n.get('index'))}: give duckdns_subdomain "
-                     f"or a static ddns endpoint")
+            sys.exit(f"node {n.get('id', n.get('index'))}: give duckdns_subdomain (DuckDNS) "
+                     f"or a static ddns endpoint (your own DDNS)")
     if explicit_port is not None and len(nodes) != 2:
         sys.exit("mesh.wg_port sets one shared port and is only valid for a 2-node "
                  "link; for >2 nodes drop it and let wg_port_base derive per-pair ports")

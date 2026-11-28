@@ -24,6 +24,9 @@
 /system identity set name="mesh-hamburg"
 /system clock set time-zone-name=UTC
 /user set [find name=admin] password="EXAMPLE-ADMIN-PASSWORD-PLACEHOLDER-NOT-REAL"
+# Resolver for the ROUTER itself: it must resolve the peer's DDNS name (tunnel), the
+# DuckDNS updater, and pool.ntp.org. use-peer-dns stays off on WAN — we use these explicitly.
+/ip dns set servers=1.1.1.1,8.8.8.8
 /system ntp client set enabled=yes
 /system ntp client servers add address=pool.ntp.org
 /ip cloud set ddns-enabled=yes
@@ -47,21 +50,7 @@
 /interface bridge port remove [find interface=ether5]
 
 #------------------------------------------------------------------------------
-# 1b. DYNAMIC DNS (DuckDNS) — keep anchorpoint-hamburg.duckdns.org on this WAN IP
-#     A scheduler re-publishes the current public IP every 5 min (and at boot) so
-#     the remote site and your roaming clients can always resolve this endpoint.
-#     check-certificate=no: RouterOS ships no CA bundle by default; the update still
-#     travels over TLS. Import the CA and flip this to =yes for strict validation.
-#------------------------------------------------------------------------------
-/system script add name=duckdns-update dont-require-permissions=yes \
-    comment="DuckDNS: keep anchorpoint-hamburg.duckdns.org pointed here" \
-    source="/tool fetch url=\"https://www.duckdns.org/update?domains=anchorpoint-hamburg&token=EXAMPLE-DUCKDNS-TOKEN-NOT-REAL&ip=\" mode=https check-certificate=no keep-result=no"
-/system scheduler add name=duckdns-update interval=5m start-time=startup \
-    on-event="/system script run duckdns-update" comment="DuckDNS refresh (5 min)"
-/system script run duckdns-update
-
-#------------------------------------------------------------------------------
-# 1c. WAN FAILOVER — Wi-Fi uplink backup on wifi2 (2.4 GHz on hAP ax2)
+# 1b. WAN FAILOVER — Wi-Fi uplink backup on wifi2 (2.4 GHz on hAP ax2)
 #     Primary WAN is the ether1 cable (default route distance 1). This joins your
 #     local router's Wi-Fi "HomeWiFi-HAM" as a station and adds a
 #     backup default route (distance 2): if the ether1 link drops, traffic — the
@@ -112,7 +101,7 @@
 /ip address add address=192.168.10.1/24 interface=bridge-local
 /ip pool add name=pool-local ranges=192.168.10.10-192.168.10.254
 /ip dhcp-server add name=dhcp-local interface=bridge-local address-pool=pool-local disabled=no
-/ip dhcp-server network add address=192.168.10.0/24 gateway=192.168.10.1 dns-server=192.168.10.1
+/ip dhcp-server network add address=192.168.10.0/24 gateway=192.168.10.1 dns-server=1.1.1.1,8.8.8.8
 /interface wifi set wifi1 configuration.mode=ap configuration.ssid="AnchorPoint-HAM" \
     security.authentication-types=wpa2-psk,wpa3-psk security.passphrase="EXAMPLE-WIFI-PASSPHRASE-PLACEHOLDER-NOT-REAL" disabled=no
 /interface bridge port add bridge=bridge-local interface=wifi1
@@ -127,7 +116,9 @@
 /ip address add address=192.168.11.1/24 interface=bridge-barcelona
 /ip pool add name=pool-barcelona ranges=192.168.11.10-192.168.11.254
 /ip dhcp-server add name=dhcp-barcelona interface=bridge-barcelona address-pool=pool-barcelona disabled=no
-/ip dhcp-server network add address=192.168.11.0/24 gateway=192.168.11.1 dns-server=192.168.11.1
+/ip dhcp-server network add address=192.168.11.0/24 gateway=192.168.11.1 dns-server=1.1.1.1,8.8.8.8
+# clients here use public DNS straight out — their src is policy-routed into the tunnel, so
+# DNS resolves at the EXIT site (correct geo, no local DNS leak).
 /interface wifi add name=vap-barcelona master-interface=wifi1 configuration.mode=ap \
     configuration.ssid="AnchorPoint-BCN" security.authentication-types=wpa2-psk,wpa3-psk \
     security.passphrase="EXAMPLE-WIFI-PASSPHRASE-PLACEHOLDER-NOT-REAL" disabled=no
@@ -183,7 +174,33 @@
     up-script=":log info \"mesh: tunnel to barcelona UP\"" \
     down-script=":local s [/system ntp client get status]; :if (\$s != \"synchronized\") do={ /system ntp client set enabled=no; :delay 1s; /system ntp client set enabled=yes; :delay 10s }; :if ([/ping 10.0.80.2 count=3] = 0) do={ :log error \"mesh: barcelona tunnel dead, restarting\"; /interface wireguard disable wg-barcelona; :delay 2s; /interface wireguard enable wg-barcelona }"
 
+#------------------------------------------------------------------------------
+# 10. DYNAMIC DNS (DuckDNS) — keep anchorpoint-hamburg.duckdns.org on this WAN IP
+#     A scheduler re-publishes the current public IP every 5 min (and at boot) so the
+#     remote site and your roaming clients can always resolve this endpoint.
+#
+#     ⚠ REQUIRES RouterOS device-mode: `scheduler` + `fetch` must be ON, which needs
+#       PHYSICAL access to the box. BEFORE applying this config, on the router run:
+#           /system/device-mode/print
+#           /system/device-mode/update scheduler=yes fetch=yes
+#       then power-cycle the device (or tap the reset/mode button) within the countdown
+#       to confirm. If device-mode is off this section fails — but it is the LAST section,
+#       so the tunnel / firewall / NAT / Wi-Fi above all still apply; only DuckDNS is
+#       missing (enable device-mode, then re-run this block). See docs/ONBOARDING.md.
+#
+#     check-certificate=no: RouterOS ships no CA bundle by default; the update still
+#       travels over TLS. Import the CA and flip this to =yes for strict validation.
+#------------------------------------------------------------------------------
+/system script add name=duckdns-update dont-require-permissions=yes \
+    comment="DuckDNS: keep anchorpoint-hamburg.duckdns.org pointed here" \
+    source="/tool fetch url=\"https://www.duckdns.org/update?domains=anchorpoint-hamburg&token=EXAMPLE-DUCKDNS-TOKEN-NOT-REAL&ip=\" mode=https check-certificate=no keep-result=no"
+/system scheduler add name=duckdns-update interval=5m start-time=startup \
+    on-event="/system script run duckdns-update" comment="DuckDNS refresh (5 min)"
+# (no immediate run here: at provision time the WAN/DNS aren't up yet — the scheduler
+#  runs it at startup and every 5 min once the link is live.)
+
 # =============================================================================
 # END mesh node hamburg.
 # Forward these UDP ports on this site's ISP router: 51820, 51823 (roaming clients)
+# DuckDNS (above) needs device-mode first:  /system/device-mode/update scheduler=yes fetch=yes  (then power-cycle to confirm)
 # =============================================================================

@@ -1,5 +1,6 @@
 {% set ap_wifi = mesh.wifi_ap_iface | default('wifi1') %}
 {% set wan_wifi = mesh.wifi_wan_iface | default('wifi2') %}
+{% set dns = mesh.dns_servers | default('1.1.1.1,8.8.8.8') %}
 # =============================================================================
 # AnchorPoint Mesh — NODE CONFIG  {{ node.color | upper }} / {{ node.location }}
 # Device: MikroTik hAP ax2 (5-port) · RouterOS v7 · full-mesh WireGuard
@@ -32,6 +33,9 @@
 /system identity set name="mesh-{{ node.color }}"
 /system clock set time-zone-name={{ mesh.timezone | default('UTC') }}
 /user set [find name=admin] password="{{ secrets[node.color ~ '_admin_password'] }}"
+# Resolver for the ROUTER itself: it must resolve the peer's DDNS name (tunnel), the
+# DuckDNS updater, and pool.ntp.org. use-peer-dns stays off on WAN — we use these explicitly.
+/ip dns set servers={{ dns }}
 /system ntp client set enabled=yes
 /system ntp client servers add address=pool.ntp.org
 /ip cloud set ddns-enabled=yes
@@ -55,26 +59,10 @@
 {% for e in node.local_ethers %}
 /interface bridge port remove [find interface={{ e }}]
 {% endfor %}
-{% if node.duckdns_subdomain %}
-
-#------------------------------------------------------------------------------
-# 1b. DYNAMIC DNS (DuckDNS) — keep {{ node.duckdns_subdomain }}.duckdns.org on this WAN IP
-#     A scheduler re-publishes the current public IP every 5 min (and at boot) so
-#     the remote site and your roaming clients can always resolve this endpoint.
-#     check-certificate=no: RouterOS ships no CA bundle by default; the update still
-#     travels over TLS. Import the CA and flip this to =yes for strict validation.
-#------------------------------------------------------------------------------
-/system script add name=duckdns-update dont-require-permissions=yes \
-    comment="DuckDNS: keep {{ node.duckdns_subdomain }}.duckdns.org pointed here" \
-    source="/tool fetch url=\"https://www.duckdns.org/update?domains={{ node.duckdns_subdomain }}&token={{ secrets['duckdns_token'] }}&ip=\" mode=https check-certificate=no keep-result=no"
-/system scheduler add name=duckdns-update interval=5m start-time=startup \
-    on-event="/system script run duckdns-update" comment="DuckDNS refresh (5 min)"
-/system script run duckdns-update
-{% endif %}
 {% if node.wan_wifi_backup %}
 
 #------------------------------------------------------------------------------
-# 1c. WAN FAILOVER — Wi-Fi uplink backup on {{ wan_wifi }} (2.4 GHz on hAP ax2)
+# 1b. WAN FAILOVER — Wi-Fi uplink backup on {{ wan_wifi }} (2.4 GHz on hAP ax2)
 #     Primary WAN is the ether1 cable (default route distance 1). This joins your
 #     local router's Wi-Fi "{{ node.wan_wifi_backup.ssid }}" as a station and adds a
 #     backup default route (distance 2): if the ether1 link drops, traffic — the
@@ -128,7 +116,7 @@
 /ip address add address={{ node.local_gw }}/24 interface=bridge-local
 /ip pool add name=pool-local ranges={{ node.local_gw[:-1] }}10-{{ node.local_gw[:-1] }}254
 /ip dhcp-server add name=dhcp-local interface=bridge-local address-pool=pool-local disabled=no
-/ip dhcp-server network add address={{ node.local_subnet }} gateway={{ node.local_gw }} dns-server={{ node.local_gw }}
+/ip dhcp-server network add address={{ node.local_subnet }} gateway={{ node.local_gw }} dns-server={{ dns }}
 /interface wifi set {{ ap_wifi }} configuration.mode=ap configuration.ssid="{{ node.ssid }}" \
     security.authentication-types=wpa2-psk,wpa3-psk security.passphrase="{{ secrets[node.color ~ '_wifi_passphrase'] }}" disabled=no
 /interface bridge port add bridge=bridge-local interface={{ ap_wifi }}
@@ -144,7 +132,9 @@
 /ip address add address={{ x.gw }}/24 interface={{ x.bridge }}
 /ip pool add name=pool-{{ x.color }} ranges={{ x.gw[:-1] }}10-{{ x.gw[:-1] }}254
 /ip dhcp-server add name=dhcp-{{ x.color }} interface={{ x.bridge }} address-pool=pool-{{ x.color }} disabled=no
-/ip dhcp-server network add address={{ x.subnet }} gateway={{ x.gw }} dns-server={{ x.gw }}
+/ip dhcp-server network add address={{ x.subnet }} gateway={{ x.gw }} dns-server={{ dns }}
+# clients here use public DNS straight out — their src is policy-routed into the tunnel, so
+# DNS resolves at the EXIT site (correct geo, no local DNS leak).
 /interface wifi add name={{ x.vap }} master-interface={{ ap_wifi }} configuration.mode=ap \
     configuration.ssid="{{ x.ssid }}" security.authentication-types=wpa2-psk,wpa3-psk \
     security.passphrase="{{ secrets[node.color ~ '_wifi_passphrase'] }}" disabled=no
@@ -208,8 +198,38 @@
     up-script=":log info \"mesh: tunnel to {{ x.color }} UP\"" \
     down-script=":local s [/system ntp client get status]; :if (\$s != \"synchronized\") do={ /system ntp client set enabled=no; :delay 1s; /system ntp client set enabled=yes; :delay 10s }; :if ([/ping {{ x.remote_wg_ip }} count=3] = 0) do={ :log error \"mesh: {{ x.color }} tunnel dead, restarting\"; /interface wireguard disable {{ x.iface }}; :delay 2s; /interface wireguard enable {{ x.iface }} }"
 {% endfor %}
+{% if node.duckdns_subdomain %}
+
+#------------------------------------------------------------------------------
+# 10. DYNAMIC DNS (DuckDNS) — keep {{ node.duckdns_subdomain }}.duckdns.org on this WAN IP
+#     A scheduler re-publishes the current public IP every 5 min (and at boot) so the
+#     remote site and your roaming clients can always resolve this endpoint.
+#
+#     ⚠ REQUIRES RouterOS device-mode: `scheduler` + `fetch` must be ON, which needs
+#       PHYSICAL access to the box. BEFORE applying this config, on the router run:
+#           /system/device-mode/print
+#           /system/device-mode/update scheduler=yes fetch=yes
+#       then power-cycle the device (or tap the reset/mode button) within the countdown
+#       to confirm. If device-mode is off this section fails — but it is the LAST section,
+#       so the tunnel / firewall / NAT / Wi-Fi above all still apply; only DuckDNS is
+#       missing (enable device-mode, then re-run this block). See docs/ONBOARDING.md.
+#
+#     check-certificate=no: RouterOS ships no CA bundle by default; the update still
+#       travels over TLS. Import the CA and flip this to =yes for strict validation.
+#------------------------------------------------------------------------------
+/system script add name=duckdns-update dont-require-permissions=yes \
+    comment="DuckDNS: keep {{ node.duckdns_subdomain }}.duckdns.org pointed here" \
+    source="/tool fetch url=\"https://www.duckdns.org/update?domains={{ node.duckdns_subdomain }}&token={{ secrets['duckdns_token'] }}&ip=\" mode=https check-certificate=no keep-result=no"
+/system scheduler add name=duckdns-update interval=5m start-time=startup \
+    on-event="/system script run duckdns-update" comment="DuckDNS refresh (5 min)"
+# (no immediate run here: at provision time the WAN/DNS aren't up yet — the scheduler
+#  runs it at startup and every 5 min once the link is live.)
+{% endif %}
 
 # =============================================================================
 # END mesh node {{ node.color }}.
 # Forward these UDP ports on this site's ISP router: {{ node.exits | map(attribute='pair_port') | join(', ') }}{{ (", " ~ node.client_port ~ " (roaming clients)") if node.client_peers else "" }}
+{% if node.duckdns_subdomain %}
+# DuckDNS (above) needs device-mode first:  /system/device-mode/update scheduler=yes fetch=yes  (then power-cycle to confirm)
+{% endif %}
 # =============================================================================

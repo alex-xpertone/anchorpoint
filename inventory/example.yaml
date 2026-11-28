@@ -15,9 +15,13 @@
 # Plus per site: a wg-clients interface (UDP wg_client_port) for your roaming test
 # devices (iPhone + MacBook) — full tunnel, so each device exits at that site.
 #
-# DDNS: each site keeps its public endpoint reachable via DuckDNS — set a
-# `duckdns_subdomain` per node and one `duckdns_token` for the account (below); the
-# router refreshes it every 5 min. The endpoint `ddns` is then derived automatically.
+# DNS / endpoint — each site needs a public name/IP its peer dials. Pick ONE mode per node:
+#   (A) DuckDNS: set `duckdns_subdomain` (+ one mesh `duckdns_token`). The router self-updates
+#       the name every 5 min; the endpoint `ddns` is derived as <subdomain>.duckdns.org.
+#       ⚠ Needs RouterOS device-mode (scheduler+fetch) enabled on each box — PHYSICAL access
+#       required (see docs/ONBOARDING.md).
+#   (B) Your own DDNS / static IP: skip duckdns_subdomain (+ duckdns_token) and set `ddns:`
+#       directly. No on-router updater, no device-mode.
 #
 # WAN failover (optional): give a node a `wan_wifi_backup` (your local router's Wi-Fi)
 # and if the ether1 cable drops, the site fails over to that Wi-Fi uplink (2.4 GHz /
@@ -35,8 +39,11 @@ mesh:
   wifi_ap_iface: wifi1           # radio for the AnchorPoint SSIDs — 5 GHz on hAP ax2
   wifi_wan_iface: wifi2          # radio for the Wi-Fi WAN backup   — 2.4 GHz on hAP ax2
                                  # (ax3 swaps these; verify with /interface wifi print)
-  duckdns_token: REPLACE_duckdns_token  # DuckDNS account token (input). gen-mesh-secrets.py
-                                        # encrypts it into the bundle and clears it here.
+  duckdns_token: REPLACE_duckdns_token  # (DDNS mode A only) DuckDNS account token; gen-mesh-
+                                        # secrets.py encrypts it into the bundle & clears it.
+                                        # Omit entirely if every node uses mode B (own ddns).
+  dns_servers: 1.1.1.1,8.8.8.8   # resolver for the router AND handed to clients (so exit
+                                 # clients' DNS follows the tunnel). Any public resolver(s).
   timezone: UTC
   secrets_file: secrets/example.sops.yaml   # generated (encrypted); gitignored
 
@@ -46,8 +53,9 @@ nodes:
     index: 1
     location: Hamburg
     country: DE
-    ddns: anchorpoint-hamburg.duckdns.org   # site endpoint (auto = <duckdns_subdomain>.duckdns.org)
-    duckdns_subdomain: anchorpoint-hamburg  # DuckDNS name kept pointed here (token = mesh.duckdns_token)
+    # --- endpoint: pick ONE DDNS mode (see header) ---
+    duckdns_subdomain: anchorpoint-hamburg  # (A) DuckDNS — endpoint auto = <sub>.duckdns.org; needs device-mode
+    # ddns: hamburg.example.com             # (B) your own DDNS/static instead — then drop duckdns_subdomain
     ssid_suffix: HAM                   # -> SSID "AnchorPoint-HAM"
     wg_public_key: REPLACE_hamburg_public_key   # filled by gen-mesh-secrets.py
     clients:                                    # roaming test devices (pubkeys filled by gen)
@@ -62,8 +70,9 @@ nodes:
     index: 2
     location: Barcelona
     country: ES
-    ddns: anchorpoint-barcelona.duckdns.org
-    duckdns_subdomain: anchorpoint-barcelona
+    # --- endpoint: pick ONE DDNS mode (see header) ---
+    duckdns_subdomain: anchorpoint-barcelona  # (A) DuckDNS
+    # ddns: barcelona.example.com             # (B) your own DDNS/static instead
     ssid_suffix: BCN                   # -> SSID "AnchorPoint-BCN"
     wg_public_key: REPLACE_barcelona_public_key
     clients:
