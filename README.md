@@ -26,14 +26,14 @@ inventory/example.yaml ─►  secrets/<name>.sops.yaml    ─►  deployments/<
         gen-mesh-secrets.py   (writes public keys back)   render-mesh.py
 ```
 
-- **You hand-write** only the small inventory: each site's `id`/name, its DuckDNS name
-  (`duckdns_subdomain`), a Wi-Fi `ssid_suffix`; and for the link, the `wg_port`,
-  `wifi_ssid_prefix` and your DuckDNS account `duckdns_token`.
+- **You hand-write** only the small inventory: each site's `id`/name, its endpoint (a
+  DuckDNS name or your own `ddns` — see [DNS / endpoint](#dns-and-endpoint-two-modes)), a
+  Wi-Fi `ssid_suffix`; and for the link, the `wg_port` and `wifi_ssid_prefix`.
 - **Generated for you** (never typed, never committed): the two WireGuard keypairs, the
   admin password and the Wi-Fi passphrase — random, stored only in the SOPS-encrypted bundle.
 - Public keys are derived and written back into the inventory (non-secret). Each site's
-  public endpoint (`ddns`) is derived from its `duckdns_subdomain`, and the `duckdns_token`
-  is moved into the encrypted bundle (see [Dynamic DNS](#dynamic-dns-duckdns)).
+  endpoint is either a DuckDNS name the router self-updates **or** your own DDNS/static IP —
+  the two [DNS modes](#dns-and-endpoint-two-modes) below.
 
 ## Port map per site (hAP ax2, 5 ports)
 
@@ -112,14 +112,14 @@ day-2 ops — in **[docs/ONBOARDING.md](docs/ONBOARDING.md)**.
 | Field | Where | Meaning |
 |-------|-------|---------|
 | `id`, `color`, `location`, `country` | per site | identity / labels (`color` = the site's short identifier) |
-| `duckdns_subdomain` | per site | DuckDNS name for this site; its endpoint `<sub>.duckdns.org` is derived from it |
-| `ddns` | per site | *(optional)* a static endpoint (DDNS name / public IP) — only for a site with **no** `duckdns_subdomain` |
+| `duckdns_subdomain` | per site | **(DNS mode A)** DuckDNS name; endpoint `<sub>.duckdns.org` derived. Router self-updates it — **needs device-mode** (physical access) |
+| `ddns` | per site | **(DNS mode B)** your own DDNS name / static IP — set this *instead* of `duckdns_subdomain`; no updater, no device-mode |
 | `ssid_suffix` | per site | Wi-Fi SSID = `wifi_ssid_prefix` + `-` + suffix |
 | `wan_wifi_backup` | per site | *(optional)* `{ssid, password}` of your local router's Wi-Fi → a **WAN failover** uplink (see below). `password` is **(secret)** — `gen` encrypts it into the bundle |
 | `wifi_ssid_prefix` | link | base SSID name |
 | `wifi_ap_iface` / `wifi_wan_iface` | link | radios for the AnchorPoint SSIDs / the Wi-Fi WAN backup (default `wifi1`=5 GHz, `wifi2`=2.4 GHz on hAP ax2; **swap on ax3**) |
 | `wg_port` | link | the WireGuard UDP port (both ends) |
-| `duckdns_token` | link | **(secret)** your DuckDNS account token; `gen-mesh-secrets.py` encrypts it into the bundle and clears it here |
+| `duckdns_token` | link | **(mode A, secret)** your DuckDNS account token; `gen-mesh-secrets.py` encrypts it into the bundle and clears it here. Omit if all nodes use mode B |
 | `wg_client_port` | link | UDP port each site serves its roaming test clients on (default 51823) |
 | `clients` | link | roaming test devices per site, e.g. `[iphone, macbook]` — each gets its own config |
 
@@ -154,28 +154,48 @@ from that site (its own WAN is your exit).
 - Connect, then open `ifconfig.me` — it should show **that site's** WAN IP. Each site's ISP
   router must forward `UDP <wg_client_port>` to the box (alongside the tunnel port).
 
-## Dynamic DNS (DuckDNS)
+## DNS and endpoint (two modes)
 
-Most home/office WANs have a **changing public IP**, so each site advertises itself with a
-free [DuckDNS](https://www.duckdns.org) name instead of a fixed IP. The other site and your
-roaming clients always dial `anchorpoint-<city>.duckdns.org`; the router keeps that name
-pointed at its current IP.
+Each site needs a public endpoint its peer dials. Pick **one mode per node**.
 
-- **You set** two things in the inventory: a `duckdns_subdomain` **per site** (the name you
-  registered at duckdns.org, without the `.duckdns.org`), and **one** `duckdns_token` for the
-  link (your DuckDNS account token — covers all your subdomains).
-- The token is a **secret**: `gen-mesh-secrets.py` moves it from the inventory into the
-  SOPS-encrypted bundle and blanks it in the inventory, so no plaintext token is ever
-  committed. (To change it later: `sops set secrets/<name>.sops.yaml '["duckdns_token"]' '"<token>"'`.)
-- Each site's endpoint (`ddns`) is **derived** as `<duckdns_subdomain>.duckdns.org` — you
-  don't set it by hand. (A site with a truly static IP can skip DuckDNS and set `ddns` directly.)
-- The generated config installs a `/system script` + `/system scheduler` that re-publishes
-  the current IP **every 5 minutes** (and at boot) — outbound, so **no port-forward** is
-  needed for DuckDNS itself.
+### Mode A — DuckDNS (self-updating)
+Most home/office WANs have a **changing public IP**, so the router keeps a free
+[DuckDNS](https://www.duckdns.org) name pointed at its current IP.
 
-> **TLS note:** the update uses `check-certificate=no` because RouterOS ships no CA bundle by
-> default (the request still travels over TLS). To validate strictly, import the DuckDNS CA
-> and flip it to `=yes` in the generated `duckdns-update` script.
+- **You set** a `duckdns_subdomain` **per site** (the name you registered at duckdns.org,
+  without `.duckdns.org`) and **one** `duckdns_token` for the link (your DuckDNS account
+  token — covers all your subdomains). The endpoint `ddns` is **derived** as
+  `<duckdns_subdomain>.duckdns.org` — don't set it by hand.
+- The token is a **secret**: `gen-mesh-secrets.py` moves it into the SOPS-encrypted bundle and
+  blanks it in the inventory. (Change it later with
+  `sops set secrets/<name>.sops.yaml '["duckdns_token"]' '"<token>"'`.)
+- The config installs a `/system script` + `/system scheduler` that re-publishes the IP
+  **every 5 min** (and at boot), outbound — **no port-forward** needed for it.
+
+> ⚠ **DuckDNS needs RouterOS device-mode** (`scheduler` + `fetch`), which is off by default on
+> RouterOS 7.17+ and can only be changed with **physical access** to the box. On each router,
+> *before* applying the config:
+> ```
+> /system/device-mode/print
+> /system/device-mode/update scheduler=yes fetch=yes
+> ```
+> then **power-cycle** (or tap the reset/mode button) within the countdown to confirm — a soft
+> reboot or SSH won't do it. It's one-time per box and survives config resets. The DuckDNS
+> block renders **last**, so if you forget, everything else still applies and only DuckDNS is
+> missing. (TLS: the update uses `check-certificate=no` — RouterOS has no CA bundle by default;
+> still over TLS. Import the CA + flip to `=yes` for strict checking.)
+
+### Mode B — your own DDNS / static IP
+Already have a DDNS name (your domain, your router's built-in DDNS, Cloudflare, …) or a static
+IP? Set it directly and skip DuckDNS — **no on-router updater, no `/tool fetch`, no scheduler,
+so no device-mode needed:**
+
+```yaml
+    # per node — instead of duckdns_subdomain:
+    ddns: vpn.mydomain.com        # your own DDNS name, or a static public IP
+```
+Drop `duckdns_subdomain` (and `mesh.duckdns_token` if *no* node uses DuckDNS). You keep that
+name pointed at the site with your existing DDNS; AnchorPoint just dials it.
 
 ## Wi-Fi WAN failover (optional)
 

@@ -23,20 +23,21 @@ your secrets.
 
 ---
 
-## Phase 0 — register DuckDNS + check for CGNAT (⚠ do this before rendering)
-Each site advertises itself with a free **DuckDNS** name (home/office public IPs change),
-and each site's config points at the **other** site's name — so both must exist first. Both
-sites are servers, so both must be reachable from the internet.
+## Phase 0 — endpoint + CGNAT check (⚠ do this before rendering)
+Each site's config dials the **other** site's endpoint, so both must exist first. Both sites
+are servers, so both must be reachable from the internet. Choose a **DNS mode per site**:
 
-1. At [duckdns.org](https://www.duckdns.org), sign in and **register one subdomain per site**
-   (e.g. `anchorpoint-hamburg`, `anchorpoint-barcelona`). Copy your account **token** (one
-   token covers all your subdomains) — you set it in the inventory once.
+- **Mode A — DuckDNS:** at [duckdns.org](https://www.duckdns.org), sign in and **register one
+  subdomain per site** (e.g. `anchorpoint-hamburg`). Copy your account **token** (covers all
+  your subdomains). ⚠ DuckDNS needs RouterOS **device-mode** enabled on each box — Phase 5.
+- **Mode B — your own DDNS / static IP:** nothing to register; you'll put your existing
+  name/IP in `ddns:` and skip DuckDNS (and device-mode) entirely.
 
 For **each** of the two sites:
 
-2. Factory-reset the hAP ax2, give it internet on `ether1`.
-3. Note the serial: `/system routerboard print` (field `serial-number`).
-4. **CGNAT check** — a site behind carrier NAT can't accept inbound tunnels:
+1. Factory-reset the hAP ax2, give it internet on `ether1`.
+2. Note the serial: `/system routerboard print` (field `serial-number`).
+3. **CGNAT check** — a site behind carrier NAT can't accept inbound tunnels:
    ```
    /ip cloud set ddns-enabled=yes
    /ip cloud print          # compare public-address to the WAN interface address
@@ -45,8 +46,8 @@ For **each** of the two sites:
    Two CGNAT'd sites cannot connect to each other — make sure at least one has a public IP
    (the other can initiate and keepalive holds the tunnel).
 
-Put each site's subdomain into `duckdns_subdomain:` and your token into `duckdns_token:`
-(next phase). The generated config keeps each name pointed at its live IP automatically.
+Then (next phase): **mode A** → put each subdomain in `duckdns_subdomain:` + the token in
+`duckdns_token:`; **mode B** → put your name/IP in `ddns:` and skip the DuckDNS fields.
 (Serials aren't in the config; keep them in your asset record.)
 
 ---
@@ -56,9 +57,12 @@ Put each site's subdomain into `duckdns_subdomain:` and your token into `duckdns
 cp inventory/example.yaml inventory/my-link.yaml          # my-link.yaml is gitignored
 ```
 Edit the two node blocks:
-- Set each `duckdns_subdomain:` (from Phase 0) and `ssid_suffix:` (its Wi-Fi name =
-  `wifi_ssid_prefix`-`suffix`). The endpoint `ddns:` is **derived** from the subdomain — leave it.
-- Set `wg_port:` (the UDP port both ends use) and `duckdns_token:` (your DuckDNS account token).
+- **Endpoint — pick a mode per node:**
+  - *Mode A (DuckDNS):* set `duckdns_subdomain:` (from Phase 0); `ddns:` is derived — leave it.
+    Set `duckdns_token:` once. ⚠ needs device-mode (Phase 5).
+  - *Mode B (own DDNS/static):* set `ddns:` to your name/IP and **remove** `duckdns_subdomain`
+    (and `duckdns_token` if no node uses DuckDNS). No device-mode.
+- Set `ssid_suffix:` (its Wi-Fi name = `wifi_ssid_prefix`-`suffix`) and `wg_port:` (the UDP port both ends use).
 - *(optional)* **WAN failover:** set each node's `wan_wifi_backup:` to your local router's Wi-Fi
   (`ssid` + `password`) so the site fails over from the `ether1` cable to a 2.4 GHz Wi-Fi uplink
   (`wifi2`) and back. The password is lifted into the bundle like the token. Remove the block for
@@ -67,8 +71,8 @@ Edit the two node blocks:
 
 Everything else (subnets, port layout, routes) is **derived** — don't hand-edit.
 
-> Your real `my-link.yaml` holds the token (until the next phase moves it) plus endpoints and
-> public keys, so it's gitignored — only `inventory/example.yaml` is committed.
+> Your real `my-link.yaml` holds your endpoints and public keys (and, in mode A, the DuckDNS
+> token until the next phase moves it), so it's gitignored — only `inventory/example.yaml` is committed.
 
 ---
 
@@ -115,6 +119,18 @@ syntax on your exact ROS build, and the per-tunnel `src-nat` return path.
 ## Phase 5 — provision each site
 For each of the two sites:
 1. Factory-reset; internet on `ether1`.
+
+   **DuckDNS (mode A) only — enable device-mode first** (needs **physical access**; skip for
+   mode B). RouterOS 7.17+ disables `scheduler` + `fetch` by default, which DuckDNS needs. On
+   the router:
+   ```
+   /system/device-mode/print
+   /system/device-mode/update scheduler=yes fetch=yes
+   ```
+   Then **power-cycle** the box (or tap the reset/mode button) within the countdown to confirm
+   — a soft reboot or SSH does **not** count. One-time per box; it survives the config reset in
+   the next step. (If you skip it, the DuckDNS section fails — but it's rendered last, so the
+   tunnel/firewall/NAT still apply; just enable device-mode and re-run that block.)
 2. Decrypt its config to a scratch file **outside the repo**:
    ```bash
    sops -d --input-type binary --output-type binary \
