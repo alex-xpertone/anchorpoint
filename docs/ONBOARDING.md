@@ -115,14 +115,25 @@ syntax on your exact ROS build, and the per-tunnel `src-nat` return path.
 ## Phase 5 — provision each site
 For each of the two sites:
 1. Factory-reset; internet on `ether1`.
-2. Decrypt its config to a scratch file **outside the repo**, paste it in
-   (WinBox → New Terminal), then shred it:
+2. Decrypt its config to a scratch file **outside the repo**:
    ```bash
    sops -d --input-type binary --output-type binary \
-     deployments/node_hamburg/bootstrap.sensitive.rsc > /tmp/hamburg.rsc
-   # paste /tmp/hamburg.rsc into the router, then:
-   shred -u /tmp/hamburg.rsc
+     deployments/node_hamburg/bootstrap.sensitive.rsc > "$TMPDIR/hamburg.rsc"
    ```
+   The bootstrap is a one-shot script that **adds** config, so you apply it to a
+   **clean** router (don't paste it over an existing config — you'd get duplicate-object
+   errors). Apply it one of two ways, then remove the scratch file
+   (`rm -P "$TMPDIR/hamburg.rsc"` — macOS has no `shred`):
+   - **Paste** `hamburg.rsc` into a fresh router (WinBox → New Terminal), **or**
+   - **Replace in one shot** (also how you re-flash an already-configured box): upload the
+     file (WinBox → Files, or `scp`), then on the router wipe-and-apply — keep defaults, the
+     config expects defconf:
+     ```
+     /system reset-configuration run-after-reset=hamburg.rsc skip-backup=yes
+     ```
+     The router resets to factory defaults, reboots, and runs the config automatically.
+     ⚠ A reset drops your connection — do it **on-site** (or with a tested config), never
+     blindly on a remote router.
 3. **Port-forward on this site's ISP router:** forward the WireGuard UDP ports (both are
    printed at the bottom of this site's `bootstrap.rsc`) to the router's WAN IP — the tunnel
    port (`wg_port`) and the roaming-clients port (`wg_client_port`).
@@ -150,14 +161,21 @@ Each site serves two roaming WireGuard clients on `wg-clients` (`UDP wg_client_p
 can test a site from your own devices — full tunnel, so you exit at that site.
 
 1. Make sure the site's ISP router forwards `UDP wg_client_port` (Phase 5).
-2. Decrypt a device config and import it (one per device, per site):
+2. Import a device config (one per device, per site). Install the QR tool once:
+   `brew install qrencode`.
    ```bash
-   sops -d deployments/node_hamburg/clients/iphone.sensitive.conf > /tmp/iphone.conf
-   # macOS WireGuard app: Import tunnel(s) from file -> /tmp/iphone.conf
-   # iPhone: scan a QR, then shred the file:
-   qrencode -t ansiutf8 < /tmp/iphone.conf   # scan in the WireGuard iOS app
-   shred -u /tmp/iphone.conf
+   # iPhone — decrypt straight into a QR in the terminal (nothing hits disk), then
+   # scan it in the WireGuard app:  ＋ → Create from QR code
+   sops -d --input-type binary --output-type binary \
+     deployments/node_hamburg/clients/iphone.sensitive.conf | qrencode -t ansiutf8
+
+   # MacBook — decrypt to a scratch file, import it (WireGuard → Import tunnel(s)
+   # from file), then remove it (macOS has no `shred`; rm -P overwrites):
+   sops -d --input-type binary --output-type binary \
+     deployments/node_hamburg/clients/macbook.sensitive.conf > "$TMPDIR/mb.conf"
+   rm -P "$TMPDIR/mb.conf"
    ```
+   (QR too dense to scan? Shrink the terminal font / widen the window, or use `-t utf8`.)
 3. Connect the device, open `ifconfig.me` — it must show **that site's** WAN IP. Switch to the
    other site's config to confirm it exits there instead.
 
@@ -167,6 +185,7 @@ can test a site from your own devices — full tunnel, so you exit at that site.
 | Task | How |
 |------|-----|
 | Inspect keys | `scripts/gen-mesh-secrets.py --inventory <inv> --list` |
+| Re-apply / replace a site's config | decrypt the new `bootstrap.sensitive.rsc`, upload it, then on the router: `/system reset-configuration run-after-reset=<file> skip-backup=yes` (keeps defaults → resets + applies cleanly). **On-site only** — a reset drops the link. |
 | Rotate a site's key | `gen-mesh-secrets.py --rotate <name>` → re-render → re-flash **both** sites (each holds the other's public key) |
 | Change a site's DuckDNS name | edit its `duckdns_subdomain:` → re-render → re-flash both sites |
 | Change the DuckDNS token | `sops set secrets/<name>.sops.yaml '["duckdns_token"]' '"<token>"'` → re-render |

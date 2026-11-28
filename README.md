@@ -96,7 +96,9 @@ scripts/render-diagrams.sh deployments/architecture.d2
 Each site gets `deployments/<site>/bootstrap.sensitive.rsc` (encrypted),
 `bootstrap.rsc` (redacted, safe to read), and `cheatsheet.md` (a printable install card).
 Decrypt a site's config to a scratch file **outside the repo**, paste it into that
-router over a console/WinBox terminal, then shred the scratch file.
+router over a console/WinBox terminal (or upload it and reset with `run-after-reset` to
+replace the config in one shot — see [ONBOARDING](docs/ONBOARDING.md)), then remove the
+scratch file (`rm -P`).
 
 Each site also gets `deployments/<site>/clients/<device>.sensitive.conf` — a ready
 WireGuard config per **test device** (iPhone, MacBook) to import on your phone/laptop
@@ -136,11 +138,18 @@ from that site (its own WAN is your exit).
 - Which devices per site is `mesh.clients` (default `[iphone, macbook]`); `gen-mesh-secrets.py`
   makes a keypair for each and `render-mesh.py` writes a ready config to
   `deployments/<site>/clients/<device>.sensitive.conf` (SOPS-encrypted).
-- Import one into the WireGuard app:
+- Import one into the WireGuard app (install the QR tool once: `brew install qrencode`):
   ```bash
-  sops -d deployments/node_hamburg/clients/iphone.sensitive.conf > /tmp/iphone.conf
-  # macOS: WireGuard app → Import tunnel(s) from file → /tmp/iphone.conf
-  # iPhone: scan a QR, then shred:  qrencode -t ansiutf8 < /tmp/iphone.conf ; shred -u /tmp/iphone.conf
+  # iPhone — decrypt straight into a QR in the terminal (nothing hits disk), then
+  # scan it in the WireGuard app:  ＋ → Create from QR code
+  sops -d --input-type binary --output-type binary \
+    deployments/node_hamburg/clients/iphone.sensitive.conf | qrencode -t ansiutf8
+
+  # MacBook — decrypt to a scratch file, import it (WireGuard → Import tunnel(s)
+  # from file), then remove it (macOS has no `shred`; rm -P overwrites):
+  sops -d --input-type binary --output-type binary \
+    deployments/node_hamburg/clients/macbook.sensitive.conf > "$TMPDIR/mb.conf"
+  rm -P "$TMPDIR/mb.conf"
   ```
 - Connect, then open `ifconfig.me` — it should show **that site's** WAN IP. Each site's ISP
   router must forward `UDP <wg_client_port>` to the box (alongside the tunnel port).
