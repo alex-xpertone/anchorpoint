@@ -24,6 +24,9 @@
 /system identity set name="mesh-hamburg"
 /system clock set time-zone-name=UTC
 /user set [find name=admin] password="EXAMPLE-ADMIN-PASSWORD-PLACEHOLDER-NOT-REAL"
+# Resolver for the ROUTER itself: it must resolve the peer's DDNS name (tunnel), the
+# DuckDNS updater, and pool.ntp.org. use-peer-dns stays off on WAN — we use these explicitly.
+/ip dns set servers=1.1.1.1,8.8.8.8
 /system ntp client set enabled=yes
 /system ntp client servers add address=pool.ntp.org
 /ip cloud set ddns-enabled=yes
@@ -98,7 +101,7 @@
 /ip address add address=192.168.10.1/24 interface=bridge-local
 /ip pool add name=pool-local ranges=192.168.10.10-192.168.10.254
 /ip dhcp-server add name=dhcp-local interface=bridge-local address-pool=pool-local disabled=no
-/ip dhcp-server network add address=192.168.10.0/24 gateway=192.168.10.1 dns-server=192.168.10.1
+/ip dhcp-server network add address=192.168.10.0/24 gateway=192.168.10.1 dns-server=1.1.1.1,8.8.8.8
 /interface wifi set wifi1 configuration.mode=ap configuration.ssid="AnchorPoint-HAM" \
     security.authentication-types=wpa2-psk,wpa3-psk security.passphrase="EXAMPLE-WIFI-PASSPHRASE-PLACEHOLDER-NOT-REAL" disabled=no
 /interface bridge port add bridge=bridge-local interface=wifi1
@@ -113,7 +116,9 @@
 /ip address add address=192.168.11.1/24 interface=bridge-barcelona
 /ip pool add name=pool-barcelona ranges=192.168.11.10-192.168.11.254
 /ip dhcp-server add name=dhcp-barcelona interface=bridge-barcelona address-pool=pool-barcelona disabled=no
-/ip dhcp-server network add address=192.168.11.0/24 gateway=192.168.11.1 dns-server=192.168.11.1
+/ip dhcp-server network add address=192.168.11.0/24 gateway=192.168.11.1 dns-server=1.1.1.1,8.8.8.8
+# clients here use public DNS straight out — their src is policy-routed into the tunnel, so
+# DNS resolves at the EXIT site (correct geo, no local DNS leak).
 /interface wifi add name=vap-barcelona master-interface=wifi1 configuration.mode=ap \
     configuration.ssid="AnchorPoint-BCN" security.authentication-types=wpa2-psk,wpa3-psk \
     security.passphrase="EXAMPLE-WIFI-PASSPHRASE-PLACEHOLDER-NOT-REAL" disabled=no
@@ -191,7 +196,8 @@
     source="/tool fetch url=\"https://www.duckdns.org/update?domains=anchorpoint-hamburg&token=EXAMPLE-DUCKDNS-TOKEN-NOT-REAL&ip=\" mode=https check-certificate=no keep-result=no"
 /system scheduler add name=duckdns-update interval=5m start-time=startup \
     on-event="/system script run duckdns-update" comment="DuckDNS refresh (5 min)"
-/system script run duckdns-update
+# (no immediate run here: at provision time the WAN/DNS aren't up yet — the scheduler
+#  runs it at startup and every 5 min once the link is live.)
 
 # =============================================================================
 # END mesh node hamburg.

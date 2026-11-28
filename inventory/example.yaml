@@ -42,6 +42,8 @@ mesh:
   duckdns_token: REPLACE_duckdns_token  # (DDNS mode A only) DuckDNS account token; gen-mesh-
                                         # secrets.py encrypts it into the bundle & clears it.
                                         # Omit entirely if every node uses mode B (own ddns).
+  dns_servers: 1.1.1.1,8.8.8.8   # resolver for the router AND handed to clients (so exit
+                                 # clients' DNS follows the tunnel). Any public resolver(s).
   timezone: UTC
   secrets_file: secrets/example.sops.yaml   # generated (encrypted); gitignored
 

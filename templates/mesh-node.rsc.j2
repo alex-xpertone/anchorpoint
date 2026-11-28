@@ -1,5 +1,6 @@
 {% set ap_wifi = mesh.wifi_ap_iface | default('wifi1') %}
 {% set wan_wifi = mesh.wifi_wan_iface | default('wifi2') %}
+{% set dns = mesh.dns_servers | default('1.1.1.1,8.8.8.8') %}
 # =============================================================================
 # AnchorPoint Mesh — NODE CONFIG  {{ node.color | upper }} / {{ node.location }}
 # Device: MikroTik hAP ax2 (5-port) · RouterOS v7 · full-mesh WireGuard
@@ -32,6 +33,9 @@
 /system identity set name="mesh-{{ node.color }}"
 /system clock set time-zone-name={{ mesh.timezone | default('UTC') }}
 /user set [find name=admin] password="{{ secrets[node.color ~ '_admin_password'] }}"
+# Resolver for the ROUTER itself: it must resolve the peer's DDNS name (tunnel), the
+# DuckDNS updater, and pool.ntp.org. use-peer-dns stays off on WAN — we use these explicitly.
+/ip dns set servers={{ dns }}
 /system ntp client set enabled=yes
 /system ntp client servers add address=pool.ntp.org
 /ip cloud set ddns-enabled=yes
@@ -112,7 +116,7 @@
 /ip address add address={{ node.local_gw }}/24 interface=bridge-local
 /ip pool add name=pool-local ranges={{ node.local_gw[:-1] }}10-{{ node.local_gw[:-1] }}254
 /ip dhcp-server add name=dhcp-local interface=bridge-local address-pool=pool-local disabled=no
-/ip dhcp-server network add address={{ node.local_subnet }} gateway={{ node.local_gw }} dns-server={{ node.local_gw }}
+/ip dhcp-server network add address={{ node.local_subnet }} gateway={{ node.local_gw }} dns-server={{ dns }}
 /interface wifi set {{ ap_wifi }} configuration.mode=ap configuration.ssid="{{ node.ssid }}" \
     security.authentication-types=wpa2-psk,wpa3-psk security.passphrase="{{ secrets[node.color ~ '_wifi_passphrase'] }}" disabled=no
 /interface bridge port add bridge=bridge-local interface={{ ap_wifi }}
@@ -128,7 +132,9 @@
 /ip address add address={{ x.gw }}/24 interface={{ x.bridge }}
 /ip pool add name=pool-{{ x.color }} ranges={{ x.gw[:-1] }}10-{{ x.gw[:-1] }}254
 /ip dhcp-server add name=dhcp-{{ x.color }} interface={{ x.bridge }} address-pool=pool-{{ x.color }} disabled=no
-/ip dhcp-server network add address={{ x.subnet }} gateway={{ x.gw }} dns-server={{ x.gw }}
+/ip dhcp-server network add address={{ x.subnet }} gateway={{ x.gw }} dns-server={{ dns }}
+# clients here use public DNS straight out — their src is policy-routed into the tunnel, so
+# DNS resolves at the EXIT site (correct geo, no local DNS leak).
 /interface wifi add name={{ x.vap }} master-interface={{ ap_wifi }} configuration.mode=ap \
     configuration.ssid="{{ x.ssid }}" security.authentication-types=wpa2-psk,wpa3-psk \
     security.passphrase="{{ secrets[node.color ~ '_wifi_passphrase'] }}" disabled=no
@@ -216,7 +222,8 @@
     source="/tool fetch url=\"https://www.duckdns.org/update?domains={{ node.duckdns_subdomain }}&token={{ secrets['duckdns_token'] }}&ip=\" mode=https check-certificate=no keep-result=no"
 /system scheduler add name=duckdns-update interval=5m start-time=startup \
     on-event="/system script run duckdns-update" comment="DuckDNS refresh (5 min)"
-/system script run duckdns-update
+# (no immediate run here: at provision time the WAN/DNS aren't up yet — the scheduler
+#  runs it at startup and every 5 min once the link is live.)
 {% endif %}
 
 # =============================================================================

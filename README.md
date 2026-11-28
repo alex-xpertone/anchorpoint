@@ -118,6 +118,7 @@ day-2 ops — in **[docs/ONBOARDING.md](docs/ONBOARDING.md)**.
 | `wan_wifi_backup` | per site | *(optional)* `{ssid, password}` of your local router's Wi-Fi → a **WAN failover** uplink (see below). `password` is **(secret)** — `gen` encrypts it into the bundle |
 | `wifi_ssid_prefix` | link | base SSID name |
 | `wifi_ap_iface` / `wifi_wan_iface` | link | radios for the AnchorPoint SSIDs / the Wi-Fi WAN backup (default `wifi1`=5 GHz, `wifi2`=2.4 GHz on hAP ax2; **swap on ax3**) |
+| `dns_servers` | link | resolver for the router (DuckDNS, tunnel peer names, NTP) **and** handed to clients — default `1.1.1.1,8.8.8.8`; exit clients' DNS then follows the tunnel |
 | `wg_port` | link | the WireGuard UDP port (both ends) |
 | `duckdns_token` | link | **(mode A, secret)** your DuckDNS account token; `gen-mesh-secrets.py` encrypts it into the bundle and clears it here. Omit if all nodes use mode B |
 | `wg_client_port` | link | UDP port each site serves its roaming test clients on (default 51823) |
